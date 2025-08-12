@@ -1,0 +1,255 @@
+Documentação da API - Grupos de Acesso
+1. Listar Grupos de Acesso
+Endpoint: GET /api/grupos-acesso
+Descrição: Retorna uma lista de grupos de acesso, incluindo as estruturas associadas.
+
+Headers
+Authorization: Bearer {token}
+Query Parameters
+page (opcional): Número da página para paginação.
+Response
+{
+    "message": "Grupos de acesso listados com sucesso!",
+    "data": {
+        "current_page": 1,
+        "data": [
+            {
+                "id": 1,
+                "nome": "Grupo A",
+                "descricao": "Descrição do Grupo A",
+                "created_at": "2025-05-12T12:00:00.000000Z",
+                "updated_at": "2025-05-12T12:00:00.000000Z",
+                "estruturas": [
+                    {
+                        "id": 1,
+                        "grupo_id": 1,
+                        "estrutura_id": 1,
+                        "nivel_acesso": "leitura",
+                        "created_at": "2025-05-12T12:00:00.000000Z",
+                        "updated_at": "2025-05-12T12:00:00.000000Z"
+                    }
+                ]
+            }
+        ],
+        "total": 10,
+        "per_page": 10,
+        "last_page": 1
+    }
+}
+
+2. Criar Grupo de Acesso
+Endpoint: POST /api/grupos-acesso
+Descrição: Cria um novo grupo de acesso e associa estruturas a ele.
+
+Headers
+Authorization: Bearer {token}
+Content-Type: application/json
+Payload
+{
+    "nome": "Grupo A",
+    "descricao": "Descrição do Grupo A",
+    "estruturas": [
+        {
+            "estrutura_id": 1,
+            "nivel_acesso": "leitura"
+        },
+        {
+            "estrutura_id": 2,
+            "nivel_acesso": "leitura_escrita"
+        }
+    ]
+}
+
+Response
+Status 201 (Criado):
+{
+    "message": "Grupo de acesso criado com sucesso!",
+    "data": {
+        "id": 1,
+        "nome": "Grupo A",
+        "descricao": "Descrição do Grupo A",
+        "created_at": "2025-05-12T12:00:00.000000Z",
+        "updated_at": "2025-05-12T12:00:00.000000Z",
+        "estruturas": [
+            {
+                "id": 1,
+                "grupo_id": 1,
+                "estrutura_id": 1,
+                "nivel_acesso": "leitura",
+                "created_at": "2025-05-12T12:00:00.000000Z",
+                "updated_at": "2025-05-12T12:00:00.000000Z"
+            },
+            {
+                "id": 2,
+                "grupo_id": 1,
+                "estrutura_id": 2,
+                "nivel_acesso": "leitura_escrita",
+                "created_at": "2025-05-12T12:00:00.000000Z",
+                "updated_at": "2025-05-12T12:00:00.000000Z"
+            }
+        ]
+    }
+}
+
+3. Visualizar Grupo de Acesso
+Endpoint: GET /api/grupos-acesso/{id}
+Descrição: Retorna os detalhes de um grupo de acesso específico, incluindo as estruturas associadas.
+
+Headers
+Authorization: Bearer {token}
+Response
+Status 200 (OK):
+{
+    "id": 1,
+    "nome": "Grupo A",
+    "descricao": "Descrição do Grupo A",
+    "created_at": "2025-05-12T12:00:00.000000Z",
+    "updated_at": "2025-05-12T12:00:00.000000Z",
+    "estruturas": [
+        {
+            "id": 1,
+            "grupo_id": 1,
+            "estrutura_id": 1,
+            "nivel_acesso": "leitura",
+            "created_at": "2025-05-12T12:00:00.000000Z",
+            "updated_at": "2025-05-12T12:00:00.000000Z"
+        }
+    ]
+}
+
+4. Atualizar Grupo de Acesso
+Endpoint: PUT /api/grupos-acesso/{id}
+Descrição: Atualiza os dados de um grupo de acesso e suas associações com estruturas.
+
+Headers
+Authorization: Bearer {token}
+Content-Type: application/json
+Payload
+{
+    "nome": "Grupo Atualizado",
+    "descricao": "Descrição atualizada do Grupo",
+    "estruturas": [
+        {
+            "estrutura_id": 1,
+            "nivel_acesso": "leitura"
+        },
+        {
+            "estrutura_id": 3,
+            "nivel_acesso": "leitura_escrita"
+        }
+    ]
+}
+
+Response
+Status 200 (OK):
+{
+    "message": "Grupo de acesso atualizado com sucesso!",
+    "data": {
+        "id": 1,
+        "nome": "Grupo Atualizado",
+        "descricao": "Descrição atualizada do Grupo",
+        "created_at": "2025-05-12T12:00:00.000000Z",
+        "updated_at": "2025-05-12T13:00:00.000000Z",
+        "estruturas": [
+            {
+                "id": 1,
+                "grupo_id": 1,
+                "estrutura_id": 1,
+                "nivel_acesso": "leitura",
+                "created_at": "2025-05-12T13:00:00.000000Z",
+                "updated_at": "2025-05-12T13:00:00.000000Z"
+            },
+            {
+                "id": 2,
+                "grupo_id": 1,
+                "estrutura_id": 3,
+                "nivel_acesso": "leitura_escrita",
+                "created_at": "2025-05-12T13:00:00.000000Z",
+                "updated_at": "2025-05-12T13:00:00.000000Z"
+            }
+        ]
+    }
+}
+
+5. Excluir Grupo de Acesso
+Endpoint: DELETE /api/grupos-acesso/{id}
+Descrição: Exclui um grupo de acesso e remove todas as associações com estruturas.
+
+Headers
+Authorization: Bearer {token}
+Response
+Status 204 (Sem Conteúdo):
+{
+    "message": "Grupo de acesso excluído com sucesso!"
+}
+
+
+6. Adicionar Usuário ao Grupo
+Endpoint: POST /api/grupos-acesso/{grupoId}/usuarios
+Descrição: Adiciona um usuário a um grupo de acesso.
+
+Headers
+Authorization: Bearer {token}
+Content-Type: application/json
+Path Parameters
+grupoId (obrigatório): ID do grupo de acesso ao qual o usuário será adicionado.
+Payload
+{
+    "usuario_id": 1
+}
+
+Response
+Status 200 (OK):
+{
+    "message": "Usuário adicionado ao grupo com sucesso!"
+}
+
+7. Listar Usuários de um Grupo
+Endpoint: GET /api/grupos-acesso/{grupoId}/usuarios
+Descrição: Retorna a lista de usuários associados a um grupo de acesso.
+
+Headers
+Authorization: Bearer {token}
+Path Parameters
+grupoId (obrigatório): ID do grupo de acesso cujos usuários serão listados.
+Response
+Status 200 (OK):
+{
+    "message": "Usuários do grupo listados com sucesso!",
+    "data": [
+        {
+            "id": 1,
+            "name": "Usuário Externo",
+            "email": "usuario@externo.com",
+            "created_at": "2025-05-12T12:00:00.000000Z",
+            "updated_at": "2025-05-12T12:00:00.000000Z"
+        },
+        {
+            "id": 2,
+            "name": "Outro Usuário",
+            "email": "outro@externo.com",
+            "created_at": "2025-05-12T12:00:00.000000Z",
+            "updated_at": "2025-05-12T12:00:00.000000Z"
+        }
+    ]
+}
+
+8. Remover Usuário do Grupo
+Endpoint: DELETE /api/grupos-acesso/{grupoId}/usuarios
+Descrição: Remove um usuário de um grupo de acesso.
+
+Headers
+Authorization: Bearer {token}
+Content-Type: application/json
+Path Parameters
+grupoId (obrigatório): ID do grupo de acesso do qual o usuário será removido.
+Payload
+{
+    "usuario_id": 1
+}
+
+Response
+Status 200 (OK):
+{
+    "message": "Usuário removido do grupo com sucesso!"
+}

@@ -1,0 +1,6 @@
+- [x] Criar pagina de login
+- [x] Criar Lista de usuários
+    - [ ] Ao editar o user, add campo para atualizar o grupo de acesso multiplo
+- [x] Criar CRUD Estruturas
+- [x] Criar CRUD de acessos
+- [ ] Add os users no CRUD de acessos
