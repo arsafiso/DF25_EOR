@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Http;
 
 class UserController extends Controller
@@ -20,20 +21,26 @@ class UserController extends Controller
             // $this->sincronizarUsuariosExternos();
 
             // Busca os campos id, name, email e role da tabela local
-            $usuarios = User::select('id', 'name', 'email', 'role', 'company_id')
-                ->with(['grupos', 'company']) // carrega o relacionamento
-                ->get()
-                ->map(function ($user) {
-                    return [
-                        'id' => $user->id,
-                        'name' => $user->name,
-                        'email' => $user->email,
-                        'role' => $user->role,
-                        'company_id' => $user->company_id,
-                        'company_name' => optional($user->company)->nome,
-                        'grupos' => $user->grupos,
-                    ];
-                });
+            $loggedUser = Auth::user();
+
+            $query = User::select('id', 'name', 'email', 'role', 'company_id')
+                ->with(['grupos', 'company']);
+
+            if ($loggedUser->role === 'admin') {
+                $query->where('company_id', $loggedUser->company_id);
+            }
+
+            $usuarios = $query->get()->map(function ($user) {
+                return [
+                    'id' => $user->id,
+                    'name' => $user->name,
+                    'email' => $user->email,
+                    'role' => $user->role,
+                    'company_id' => $user->company_id,
+                    'company_name' => optional($user->company)->nome,
+                    'grupos' => $user->grupos,
+                ];
+            });
 
             return response()->json([
                 'message' => 'Usuários listados com sucesso!',
@@ -91,6 +98,12 @@ class UserController extends Controller
      */
     public function store(Request $request)
     {
+        $loggedUser = Auth::user();
+
+        if ($loggedUser->role === 'admin' && $request->input('company_id') != $loggedUser->company_id) {
+            return response()->json(['error' => 'Você não tem permissão para criar usuários para outra empresa.'], 403);
+        }
+
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'email' => 'required|email|unique:users,email',
@@ -121,10 +134,19 @@ class UserController extends Controller
      */
     public function update(Request $request, $id)
     {
+        $loggedUser = Auth::user();
         $user = User::find($id);
 
         if (!$user) {
             return response()->json(['error' => 'Usuário não encontrado'], 404);
+        }
+
+        if ($loggedUser->role === 'admin' && $user->company_id != $loggedUser->company_id) {
+            return response()->json(['error' => 'Você não tem permissão para editar usuários de outra empresa.'], 403);
+        }
+
+        if ($loggedUser->role === 'admin' && $request->input('company_id') != $loggedUser->company_id) {
+            return response()->json(['error' => 'Você não pode alterar o usuário para outra empresa.'], 403);
         }
 
         $validated = $request->validate([
@@ -158,10 +180,15 @@ class UserController extends Controller
      */
     public function destroy($id)
     {
+        $loggedUser = Auth::user();
         $user = User::find($id);
 
         if (!$user) {
             return response()->json(['error' => 'Usuário não encontrado'], 404);
+        }
+
+        if ($loggedUser->role === 'admin' && $user->company_id != $loggedUser->company_id) {
+            return response()->json(['error' => 'Você não tem permissão para excluir usuários de outra empresa.'], 403);
         }
 
         $user->delete();

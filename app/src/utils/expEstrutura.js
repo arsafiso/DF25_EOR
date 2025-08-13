@@ -23,11 +23,33 @@ export function exportarEstrutura(structure) {
         ]
     };
 
+    // Lista de campos que possuem unidade
+    const camposComUnidade = [
+        'elevacao_crista',
+        'elevacao_base',
+        'altura_maxima_federal',
+        'altura_maxima_estadual',
+        'area_reservatorio_crista',
+        'area_reservatorio_soleira',
+        'altura_maxima_entre_bermas',
+        'largura_bermas',
+        'area_bacia_contribuicao',
+        'area_espelho_dagua',
+        'na_maximo_operacional',
+        'na_maximo_maximorum',
+        'borda_livre',
+        'volume_transito_cheias',
+    ];
     const sheets = {};
     for (const [aba, campos] of Object.entries(abas)) {
         const row = {};
         campos.forEach(campo => {
             row[campo] = structure[campo];
+            if (camposComUnidade.includes(campo)) {
+                // nome da coluna de unidade
+                const unidadeCampo = 'unidade_' + campo;
+                row[unidadeCampo] = structure[unidadeCampo] || '';
+            }
         });
         sheets[aba] = XLSX.utils.json_to_sheet([row]);
     }

@@ -50,9 +50,11 @@ class EstruturaController extends Controller
             $estrutura = Estrutura::create(array_merge(
                 $request->validated(),
                 [
-                    'created_by' => Auth::id(), 
+                    'created_by' => Auth::id(),
                     'updated_by' => Auth::id(),
-                    'company_id' => $user->company_id,
+                    'company_id' => ($user->role === 'superadmin' && $request->input('company_id'))
+                        ? $request->input('company_id')
+                        : $user->company_id,
                     'altura_maxima_federal' => $request->input('altura_maxima_federal'),
                     'altura_maxima_estadual' => $request->input('altura_maxima_estadual'),
                 ]
@@ -169,17 +171,28 @@ class EstruturaController extends Controller
             ->orderBy('created_at', 'desc')
             ->get()
             ->map(function ($audit) {
+                
+                $fields = array_unique(array_merge(
+                    array_keys((array)$audit->old_values),
+                    array_keys((array)$audit->new_values)
+                ));
+                // Remove o campo updated_by
+                $fields = array_filter($fields, fn($f) => $f !== 'updated_by');
+                $changes = collect($fields)
+                    ->mapWithKeys(function ($field) use ($audit) {
+                        return [
+                            $field => [
+                                'old' => $audit->old_values[$field] ?? null,
+                                'new' => $audit->new_values[$field] ?? null,
+                            ]
+                        ];
+                    });
                 return [
                     'id' => $audit->id,
                     'user' => $audit->user ? ['name' => $audit->user->name] : null,
                     'created_at' => $audit->created_at,
                     'justificativa' => $audit->justificativa,
-                    'changes' => collect($audit->old_values)->map(function ($old, $field) use ($audit) {
-                        return [
-                            'old' => $old,
-                            'new' => $audit->new_values[$field] ?? null,
-                        ];
-                    }),
+                    'changes' => $changes,
                 ];
             });
 

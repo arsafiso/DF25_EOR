@@ -29,17 +29,26 @@ const structure = ref({
     classificacao_federal: null,
     classificacao_estadual: null,
     classificacao_cda: '',
+    empresa_id: null, 
 
     // Technical Measurements
     elevacao_crista: null,
+    unidade_elevacao_crista: 'm',
     altura_maxima_federal: '',
+    unidade_altura_maxima_federal: 'm',
     altura_maxima_estadual: '',
+    unidade_altura_maxima_estadual: 'm',
     largura_coroamento: '',
     area_reservatorio_crista: null,
+    unidade_area_reservatorio_crista: 'km²',
     area_reservatorio_soleira: null,
+    unidade_area_reservatorio_soleira: 'km²',
     elevacao_base: '',
+    unidade_elevacao_base: 'm',
     altura_maxima_entre_bermas: null,
+    unidade_altura_maxima_entre_bermas: 'm',
     largura_bermas: '',
+    unidade_largura_bermas: 'm',
 
     // Structural Details
     tipo_secao: '',
@@ -50,16 +59,26 @@ const structure = ref({
 
     // Hydraulic Parameters
     area_bacia_contribuicao: null,
+    unidade_area_bacia_contribuicao: 'km²',
     area_espelho_dagua: null,
+    unidade_area_espelho_dagua: 'km²',
     na_maximo_operacional: null,
+    unidade_na_maximo_operacional: 'm',
     na_maximo_maximorum: null,
+    unidade_na_maximo_maximorum: 'm',
     borda_livre: null,
+    unidade_borda_livre: 'm',
     volume_transito_cheias: null,
+    unidade_volume_transito_cheias: 'm³',
     sistema_extravasor: '',
 
     // Comments
     comentarios: []
 });
+// Unidades de medida
+const unidadeComprimento = ['mm', 'cm', 'dm', 'm', 'dam', 'hm', 'km'];
+const unidadesArea = ['mm²', 'cm²', 'dm²', 'm²', 'dam²', 'hm²', 'km²'];
+const unidadesVolume = ['mm³', 'cm³', 'dm³', 'm³', 'dam³', 'hm³', 'km³'];
 
 // Validation
 const validationErrors = ref({});
@@ -71,7 +90,10 @@ const structureId = computed(() => route.params.id);
 const formTitle = computed(() => (isEditing.value ? 'Editar Estrutura' : 'Criar Estrutura'));
 
 onMounted(async () => {
-    console.log('entrou 0');//para debug
+    if (!isEditing.value && route.query.empresaId) {
+        structure.value.empresa_id = Number(route.query.empresaId);
+    }
+
     if (isEditing.value) {
         const { data, error } = await structureStore.getStructureById(structureId.value);
 
@@ -90,14 +112,14 @@ onMounted(async () => {
         }
     }
 
-    console.log('entrou 1');//para debug
+    //console.log('entrou 1');//para debug
     // Buscar comentários da estrutura
     try {
         const comentariosResp = await axios.get(`/estruturas/${structureId.value}/comentarios`);
-        console.log('entrou 2');//para debug
+        //console.log('entrou 2');//para debug
 
         if (comentariosResp.status >= 200 && comentariosResp.status < 300) {
-            console.log('entrou 3');//para debug
+            //console.log('entrou 3');//para debug
             structure.value.comentarios = comentariosResp.data;
             
         } else {
@@ -108,7 +130,7 @@ onMounted(async () => {
         console.error('Error fetching comments:', e);
         toast.add({ severity: 'error', summary: 'Erro', detail: 'Falha de comunicação ao carregar comentários', life: 3000 });
     }
-    console.log('entrou 4');//para debug
+    //console.log('entrou 4');//para debug
 
     await carregarArquivosClassificacao();
 });
@@ -192,7 +214,13 @@ const saveStructure = async () => {
                 });
             }
         } else {
-            const result = await structureStore.createStructure(structure.value);
+            // Superadmin usa empresa selecionada
+            let payload = { ...structure.value };
+            if (isSuperAdmin.value && route.query.empresaId) {
+                payload.empresa_id = Number(route.query.empresaId);
+                payload.company_id = Number(route.query.empresaId);
+            }
+            const result = await structureStore.createStructure(payload);
             if (result && result.error) {
                 toast.add({
                     severity: 'error',
@@ -250,7 +278,7 @@ onMounted(async () => {
         console.error('Error fetching comments:', e);
         toast.add({ severity: 'error', summary: 'Erro', detail: 'Falha de comunicação ao carregar comentários', life: 3000 });
     }
-    console.log('entrou 4');//para debug
+    //console.log('entrou 4');//para debug
 
     await carregarArquivosClassificacao();
 });
@@ -416,26 +444,41 @@ const auditFieldLabels = {
     classificacao_estadual: 'Classificação Estadual',
     classificacao_cda: 'Classificação CDA',
     elevacao_crista: 'Elevação da Crista',
+    unidade_elevacao_crista: 'Unidade da Elevação da Crista',
     altura_maxima_federal: 'Altura máxima da barragem (Lei Federal 14.066/2020)',
+    unidade_altura_maxima_federal: 'Unidade da Altura Máxima Federal',
     altura_maxima_estadual: 'Altura máxima da barragem (Lei Estadual 23.291/2019)',
+    unidade_altura_maxima_estadual: 'Unidade da Altura Máxima Estadual',
     largura_coroamento: 'Largura/comprimento do coroamento',
     area_reservatorio_crista: 'Área do reservatório (até a crista)',
+    unidade_area_reservatorio_crista: 'Unidade da Área do Reservatório (Crista)',
     area_reservatorio_soleira: 'Área do reservatório (até a soleira)',
+    unidade_area_reservatorio_soleira: 'Unidade da Área do Reservatório (Soleira)',
     elevacao_base: 'Elevação da Base',
+    unidade_elevacao_base: 'Unidade da Elevação da Base',
     altura_maxima_entre_bermas: 'Altura Máxima entre Bermas',
+    unidade_altura_maxima_entre_bermas: 'Unidade da Altura Máxima entre Bermas',
     largura_bermas: 'Largura das bermas',
+    unidade_largura_bermas: 'Unidade da Largura das Bermas',
     tipo_secao: 'Tipo de seção',
     drenagem_interna: 'Drenagem interna',
     instrumentacao: 'Instrumentação',
     fundacao: 'Fundação',
     analises_estabilidade: 'Análises de Estabilidade e Percolação',
     area_bacia_contribuicao: 'Área da Bacia de Contribuição',
+    unidade_area_bacia_contribuicao: 'Unidade da Área da Bacia de Contribuição',
     area_espelho_dagua: "Área do Espelho d'água",
+    unidade_area_espelho_dagua: "Unidade da Área do Espelho d'água",
     na_maximo_operacional: 'NA Máximo Operacional',
+    unidade_na_maximo_operacional: 'Unidade do NA Máximo Operacional',
     na_maximo_maximorum: 'NA Máximo Maximorum',
+    unidade_na_maximo_maximorum: 'Unidade do NA Máximo Maximorum',
     borda_livre: 'Borda Livre (NA Máximo Maximorum)',
+    unidade_borda_livre: 'Unidade da Borda Livre',
     volume_transito_cheias: 'Volume disponível para trânsito de cheias',
-    sistema_extravasor: 'Sistema Extravasor'
+    unidade_volume_transito_cheias: 'Unidade do Volume para Trânsito de Cheias',
+    sistema_extravasor: 'Sistema Extravasor',
+    file_upload: 'Upload de Arquivo'
 };
 
 // Função para obter o label amigável do campo
@@ -581,69 +624,95 @@ function formatDateTime(dateStr) {
                                 <div class="grid gap-4">
                                     <div class="col-span-12 md:col-span-6 mb-4">
                                         <label for="elevacao_crista" class="block mb-2">Elevação da Crista</label>
-                                        <InputNumber fluid id="elevacao_crista" v-model="structure.elevacao_crista" :minFractionDigits="1" :maxFractionDigits="2" :class="{ 'p-invalid': validationErrors.elevacao_crista }" />
+                                        <div class="flex gap-2">
+                                            <InputNumber fluid id="elevacao_crista" v-model="structure.elevacao_crista" :minFractionDigits="1" :maxFractionDigits="3" :class="{ 'p-invalid': validationErrors.elevacao_crista }" />
+                                            <Select v-model="structure.unidade_elevacao_crista" :options="unidadeComprimento" class="w-24" />
+                                        </div>
                                         <small v-if="validationErrors.elevacao_crista" class="p-error">{{ validationErrors.elevacao_crista }}</small>
                                     </div>
 
                                     <div class="col-span-12 md:col-span-6 mb-4">
                                         <label for="elevacao_base" class="block mb-2">Elevação da Base</label>
-                                        <InputText fluid id="elevacao_base" v-model="structure.elevacao_base" :class="{ 'p-invalid': validationErrors.elevacao_base }" />
+                                        <div class="flex gap-2">
+                                            <InputNumber fluid id="elevacao_base" v-model="structure.elevacao_base" :minFractionDigits="1" :maxFractionDigits="3" :class="{ 'p-invalid': validationErrors.elevacao_base }" />
+                                            <Select v-model="structure.unidade_elevacao_base" :options="unidadeComprimento" class="w-24" />
+                                        </div>
                                         <small v-if="validationErrors.elevacao_base" class="p-error">{{ validationErrors.elevacao_base }}</small>
                                     </div>
 
                                     <div class="col-span-12 md:col-span-6 mb-4">
                                         <label for="altura_maxima_federal" class="block mb-2">Altura máxima da barragem (Lei Federal 14.066/2020)</label>
-                                        <InputText fluid id="altura_maxima_federal" v-model="structure.altura_maxima_federal" :class="{ 'p-invalid': validationErrors.altura_maxima_federal }" />
+                                        <div class="flex gap-2">
+                                            <InputNumber fluid id="altura_maxima_federal" v-model="structure.altura_maxima_federal" :minFractionDigits="1" :maxFractionDigits="3" :class="{ 'p-invalid': validationErrors.altura_maxima_federal }" />
+                                            <Select v-model="structure.unidade_altura_maxima_federal" :options="unidadeComprimento" class="w-24" />
+                                        </div>
                                         <small v-if="validationErrors.altura_maxima_federal" class="p-error">{{ validationErrors.altura_maxima_federal }}</small>
                                     </div>
 
                                     <div class="col-span-12 md:col-span-6 mb-4">
                                         <label for="altura_maxima_estadual" class="block mb-2">Altura máxima da barragem (Lei Estadual 23.291/2019)</label>
-                                        <InputText fluid id="altura_maxima_estadual" v-model="structure.altura_maxima_estadual" :class="{ 'p-invalid': validationErrors.altura_maxima_estadual }" />
+                                        <div class="flex gap-2">
+                                            <InputNumber fluid id="altura_maxima_estadual" v-model="structure.altura_maxima_estadual" :minFractionDigits="1" :maxFractionDigits="3" :class="{ 'p-invalid': validationErrors.altura_maxima_estadual }" />
+                                            <Select v-model="structure.unidade_altura_maxima_estadual" :options="unidadeComprimento" class="w-24" />
+                                        </div>
                                         <small v-if="validationErrors.altura_maxima_estadual" class="p-error">{{ validationErrors.altura_maxima_estadual }}</small>
                                     </div>
 
                                     <div class="col-span-12 mb-4">
                                         <label for="largura_coroamento" class="block mb-2">Largura/comprimento do coroamento</label>
-                                        <InputText fluid id="largura_coroamento" v-model="structure.largura_coroamento" :class="{ 'p-invalid': validationErrors.largura_coroamento }" />
+                                        <div class="flex gap-2">
+                                            <InputText fluid id="largura_coroamento" v-model="structure.largura_coroamento" :class="{ 'p-invalid': validationErrors.largura_coroamento }" />
+                                        </div>
                                         <small v-if="validationErrors.largura_coroamento" class="p-error">{{ validationErrors.largura_coroamento }}</small>
                                     </div>
 
                                     <div class="col-span-12 md:col-span-6 mb-4">
                                         <label for="area_reservatorio_crista" class="block mb-2">Área do reservatório (até a crista)</label>
-                                        <InputNumber fluid id="area_reservatorio_crista" v-model="structure.area_reservatorio_crista" :minFractionDigits="1" :maxFractionDigits="2" :class="{ 'p-invalid': validationErrors.area_reservatorio_crista }" />
+                                        <div class="flex gap-2">
+                                            <InputNumber fluid id="area_reservatorio_crista" v-model="structure.area_reservatorio_crista" :minFractionDigits="1" :maxFractionDigits="3" :class="{ 'p-invalid': validationErrors.area_reservatorio_crista }" />
+                                            <Select v-model="structure.unidade_area_reservatorio_crista" :options="unidadesArea" class="w-24" />
+                                        </div>
                                         <small v-if="validationErrors.area_reservatorio_crista" class="p-error">{{ validationErrors.area_reservatorio_crista }}</small>
                                     </div>
 
                                     <div class="col-span-12 md:col-span-6 mb-4">
                                         <label for="area_reservatorio_soleira" class="block mb-2">Área do reservatório (até a soleira)</label>
-                                        <InputNumber
-                                            fluid
-                                            id="area_reservatorio_soleira"
-                                            v-model="structure.area_reservatorio_soleira"
-                                            :minFractionDigits="1"
-                                            :maxFractionDigits="2"
-                                            :class="{ 'p-invalid': validationErrors.area_reservatorio_soleira }"
-                                        />
+                                        <div class="flex gap-2">
+                                            <InputNumber
+                                                fluid
+                                                id="area_reservatorio_soleira"
+                                                v-model="structure.area_reservatorio_soleira"
+                                                :minFractionDigits="1"
+                                                :maxFractionDigits="3"
+                                                :class="{ 'p-invalid': validationErrors.area_reservatorio_soleira }"
+                                            />
+                                            <Select v-model="structure.unidade_area_reservatorio_soleira" :options="unidadesArea" class="w-24" />
+                                        </div>
                                         <small v-if="validationErrors.area_reservatorio_soleira" class="p-error">{{ validationErrors.area_reservatorio_soleira }}</small>
                                     </div>
 
                                     <div class="col-span-12 md:col-span-6 mb-4">
                                         <label for="altura_maxima_entre_bermas" class="block mb-2">Altura Máxima entre Bermas</label>
-                                        <InputNumber
-                                            fluid
-                                            id="altura_maxima_entre_bermas"
-                                            v-model="structure.altura_maxima_entre_bermas"
-                                            :minFractionDigits="1"
-                                            :maxFractionDigits="2"
-                                            :class="{ 'p-invalid': validationErrors.altura_maxima_entre_bermas }"
-                                        />
+                                        <div class="flex gap-2">
+                                            <InputNumber
+                                                fluid
+                                                id="altura_maxima_entre_bermas"
+                                                v-model="structure.altura_maxima_entre_bermas"
+                                                :minFractionDigits="1"
+                                                :maxFractionDigits="3"
+                                                :class="{ 'p-invalid': validationErrors.altura_maxima_entre_bermas }"
+                                            />
+                                            <Select v-model="structure.unidade_altura_maxima_entre_bermas" :options="unidadeComprimento" class="w-24" />
+                                        </div>
                                         <small v-if="validationErrors.altura_maxima_entre_bermas" class="p-error">{{ validationErrors.altura_maxima_entre_bermas }}</small>
                                     </div>
 
                                     <div class="col-span-12 md:col-span-6 mb-4">
                                         <label for="largura_bermas" class="block mb-2">Largura das bermas</label>
-                                        <InputText fluid id="largura_bermas" v-model="structure.largura_bermas" :class="{ 'p-invalid': validationErrors.largura_bermas }" />
+                                        <div class="flex gap-2">
+                                            <InputNumber fluid id="largura_bermas" v-model="structure.largura_bermas" :minFractionDigits="1" :maxFractionDigits="3" :class="{ 'p-invalid': validationErrors.largura_bermas }" />
+                                            <Select v-model="structure.unidade_largura_bermas" :options="unidadeComprimento" class="w-24" />
+                                        </div>
                                         <small v-if="validationErrors.largura_bermas" class="p-error">{{ validationErrors.largura_bermas }}</small>
                                     </div>
                                 </div>
@@ -687,44 +756,62 @@ function formatDateTime(dateStr) {
                                 <div class="grid gap-4">
                                     <div class="col-span-12 md:col-span-6 mb-4">
                                         <label for="area_bacia_contribuicao" class="block mb-2">Área da Bacia de Contribuição</label>
-                                        <InputNumber fluid id="area_bacia_contribuicao" v-model="structure.area_bacia_contribuicao" :minFractionDigits="1" :maxFractionDigits="2" :class="{ 'p-invalid': validationErrors.area_bacia_contribuicao }" />
+                                        <div class="flex gap-2">
+                                            <InputNumber fluid id="area_bacia_contribuicao" v-model="structure.area_bacia_contribuicao" :minFractionDigits="1" :maxFractionDigits="3" :class="{ 'p-invalid': validationErrors.area_bacia_contribuicao }" />
+                                            <Select v-model="structure.unidade_area_bacia_contribuicao" :options="unidadesArea" class="w-24" />
+                                        </div>
                                         <small v-if="validationErrors.area_bacia_contribuicao" class="p-error">{{ validationErrors.area_bacia_contribuicao }}</small>
                                     </div>
 
                                     <div class="col-span-12 md:col-span-6 mb-4">
                                         <label for="waterMirrorArea" class="block mb-2">Área do Espelho d'água</label>
-                                        <InputNumber fluid id="waterMirrorArea" v-model="structure.area_espelho_dagua" :minFractionDigits="1" :maxFractionDigits="2" :class="{ 'p-invalid': validationErrors.area_espelho_dagua }" />
+                                        <div class="flex gap-2">
+                                            <InputNumber fluid id="waterMirrorArea" v-model="structure.area_espelho_dagua" :minFractionDigits="1" :maxFractionDigits="3" :class="{ 'p-invalid': validationErrors.area_espelho_dagua }" />
+                                            <Select v-model="structure.unidade_area_espelho_dagua" :options="unidadesArea" class="w-24" />
+                                        </div>
                                         <small v-if="validationErrors.area_espelho_dagua" class="p-error">{{ validationErrors.area_espelho_dagua }}</small>
                                     </div>
 
                                     <div class="col-span-12 md:col-span-6 mb-4">
                                         <label for="maximumOperationalNA" class="block mb-2">NA Máximo Operacional</label>
-                                        <InputNumber fluid id="maximumOperationalNA" v-model="structure.na_maximo_operacional" :minFractionDigits="1" :maxFractionDigits="2" :class="{ 'p-invalid': validationErrors.na_maximo_operacional }" />
+                                        <div class="flex gap-2">
+                                            <InputNumber fluid id="maximumOperationalNA" v-model="structure.na_maximo_operacional" :minFractionDigits="1" :maxFractionDigits="3" :class="{ 'p-invalid': validationErrors.na_maximo_operacional }" />
+                                            <Select v-model="structure.unidade_na_maximo_operacional" :options="unidadeComprimento" class="w-24" />
+                                        </div>
                                         <small v-if="validationErrors.na_maximo_operacional" class="p-error">{{ validationErrors.na_maximo_operacional }}</small>
                                     </div>
 
                                     <div class="col-span-12 md:col-span-6 mb-4">
                                         <label for="maximumMaximumNA" class="block mb-2">NA Máximo Maximorum</label>
-                                        <InputNumber fluid id="maximumMaximumNA" v-model="structure.na_maximo_maximorum" :minFractionDigits="1" :maxFractionDigits="2" :class="{ 'p-invalid': validationErrors.na_maximo_maximorum }" />
+                                        <div class="flex gap-2">
+                                            <InputNumber fluid id="maximumMaximumNA" v-model="structure.na_maximo_maximorum" :minFractionDigits="1" :maxFractionDigits="3" :class="{ 'p-invalid': validationErrors.na_maximo_maximorum }" />
+                                            <Select v-model="structure.unidade_na_maximo_maximorum" :options="unidadeComprimento" class="w-24" />
+                                        </div>
                                         <small v-if="validationErrors.na_maximo_maximorum" class="p-error">{{ validationErrors.na_maximo_maximorum }}</small>
                                     </div>
 
                                     <div class="col-span-12 md:col-span-6 mb-4">
                                         <label for="freeBoard" class="block mb-2">Borda Livre (NA Máximo Maximorum)</label>
-                                        <InputNumber fluid id="freeBoard" v-model="structure.borda_livre" :minFractionDigits="1" :maxFractionDigits="2" :class="{ 'p-invalid': validationErrors.borda_livre }" />
+                                        <div class="flex gap-2">
+                                            <InputNumber fluid id="freeBoard" v-model="structure.borda_livre" :minFractionDigits="1" :maxFractionDigits="3" :class="{ 'p-invalid': validationErrors.borda_livre }" />
+                                            <Select v-model="structure.unidade_borda_livre" :options="unidadeComprimento" class="w-24" />
+                                        </div>
                                         <small v-if="validationErrors.borda_livre" class="p-error">{{ validationErrors.borda_livre }}</small>
                                     </div>
 
                                     <div class="col-span-12 md:col-span-6 mb-4">
                                         <label for="availableVolumeForFloodTransit" class="block mb-2">Volume disponível para trânsito de cheias</label>
-                                        <InputNumber
-                                            fluid
-                                            id="availableVolumeForFloodTransit"
-                                            v-model="structure.volume_transito_cheias"
-                                            :minFractionDigits="1"
-                                            :maxFractionDigits="2"
-                                            :class="{ 'p-invalid': validationErrors.volume_transito_cheias }"
-                                        />
+                                        <div class="flex gap-2">
+                                            <InputNumber
+                                                fluid
+                                                id="availableVolumeForFloodTransit"
+                                                v-model="structure.volume_transito_cheias"
+                                                :minFractionDigits="1"
+                                                :maxFractionDigits="3"
+                                                :class="{ 'p-invalid': validationErrors.volume_transito_cheias }"
+                                            />
+                                            <Select v-model="structure.unidade_volume_transito_cheias" :options="unidadesVolume" class="w-24" />
+                                        </div>
                                         <small v-if="validationErrors.volume_transito_cheias" class="p-error">{{ validationErrors.volume_transito_cheias }}</small>
                                     </div>
 

@@ -5,13 +5,20 @@ namespace App\Http\Controllers;
 use App\Models\Company;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 
 class CompanyController extends Controller
 {
     // Listar todas as empresas
     public function index()
     {
-        return response()->json(Company::all());
+        $user = Auth::user();
+        if ($user && $user->role === 'superadmin') {
+            return response()->json(Company::all());
+            
+        }
+        $company = Company::where('id', $user->company_id)->get();
+        return response()->json($company);
     }
 
     // Criar nova empresa

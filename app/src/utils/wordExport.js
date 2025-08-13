@@ -37,6 +37,24 @@ export function exportStructureWord(structure, layoutTabela) {
     const tableRows = [];
     const rowHeight = 302;
 
+    // Lista de campos que possuem unidade
+    const camposComUnidade = [
+        'elevacao_crista',
+        'elevacao_base',
+        'altura_maxima_federal',
+        'altura_maxima_estadual',
+        'area_reservatorio_crista',
+        'area_reservatorio_soleira',
+        'altura_maxima_entre_bermas',
+        'largura_bermas',
+        'area_bacia_contribuicao',
+        'area_espelho_dagua',
+        'na_maximo_operacional',
+        'na_maximo_maximorum',
+        'borda_livre',
+        'volume_transito_cheias',
+    ];
+
     layoutTabela.forEach((row) => {
         if (row.type === 'header') {
             tableRows.push(
@@ -58,16 +76,23 @@ export function exportStructureWord(structure, layoutTabela) {
                 })
             );
         } else if (row.type === 'data') {
-            const valor = structure[row.key] != null ? String(structure[row.key]) : '';
+            let valor = structure[row.key] != null ? String(structure[row.key]) : '';
+            // Se o campo tem unidade, concatena
+            if (camposComUnidade.includes(row.key)) {
+                const unidadeCampo = 'unidade_' + row.key;
+                const unidade = structure[unidadeCampo] || '';
+                if (valor && unidade) {
+                    valor = valor + ' ' + unidade;
+                } else if (unidade) {
+                    valor = unidade;
+                }
+            }
             const bookmarkName = row.key;
-            
             const cells = [
-                // Célula 1: Nome do Campo
                 new TableCell({
                     children: [new Paragraph({ children: createMultiLineText(row.label), style: 'normalPara' })],
                     verticalAlign: VerticalAlign.CENTER,
                 }),
-                // Célula 2: Valor do Campo
                 new TableCell({
                     children: [
                         new Paragraph({
@@ -84,14 +109,12 @@ export function exportStructureWord(structure, layoutTabela) {
                     verticalAlign: VerticalAlign.CENTER,
                 }),
             ];
-            
             if (row.rastreabilidade) {
                 const rastreabilidadeCellOptions = {
                     // Célula de Rastreabilidade 
                     children: [new Paragraph({ children: createMultiLineText(row.rastreabilidade.text || ''), style: 'normalPara' })],
                     verticalAlign: VerticalAlign.CENTER,
                 };
-                
                 if (row.rastreabilidade.rowSpan) {
                     rastreabilidadeCellOptions.rowSpan = row.rastreabilidade.rowSpan;
                 }

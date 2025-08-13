@@ -45,6 +45,18 @@ class ArquivoClassificacaoController extends Controller
                 $filePath = $file->storeAs("{$this->caminhoBase}/{$estruturaId}/{$arquivo->id}", $arquivo->nome_arquivo, $disk);
                 Log::info($filePath);
                 $arquivos[] = $arquivo;
+
+                // Audit - upload de arquivos de classificação
+                $estrutura = $arquivo->estrutura;
+                if ($estrutura && method_exists($estrutura, 'audits')) {
+                    $estrutura->isCustomEvent = true;
+                    $estrutura->auditEvent = 'file_upload';
+                    $estrutura->auditCustomOld = [];
+                    $estrutura->auditCustomNew = ['file_upload' => $arquivo->nome_arquivo];
+                    $estrutura->setAttribute('justificativa', 'Carregamento de arquivo de classificação.');
+                    \OwenIt\Auditing\Facades\Auditor::execute($estrutura);
+                    $estrutura->isCustomEvent = false;
+                }
             }
 
             return response()->json($arquivos, 201);
@@ -75,7 +87,12 @@ class ArquivoClassificacaoController extends Controller
                     'Content-Disposition' => 'attachment; filename="' . $arquivo->nome_arquivo . '"',
                 ]);
             } else {
-                return response()->download(storage_path("app/public/{$path}"), $arquivo->nome_arquivo);
+                // Para disco local
+                $absolutePath = Storage::disk($disk)->path($path);
+                if (!file_exists($absolutePath)) {
+                    return response()->json(['error' => 'Arquivo não encontrado no disco'], 404);
+                }
+                return response()->download($absolutePath, $arquivo->nome_arquivo);
             }
         }
 
