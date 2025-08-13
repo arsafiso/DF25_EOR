@@ -27,7 +27,8 @@ class UserController extends Controller
                 ->with(['grupos', 'company']);
 
             if ($loggedUser->role === 'admin') {
-                $query->where('company_id', $loggedUser->company_id);
+                $query->where('company_id', $loggedUser->company_id)
+                       ->where('role', '!=', 'superadmin');
             }
 
             $usuarios = $query->get()->map(function ($user) {

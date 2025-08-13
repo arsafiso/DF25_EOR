@@ -4,6 +4,8 @@ import { useRoute, useRouter } from 'vue-router';
 import { useToast } from 'primevue/usetoast';
 import { useConfirm } from 'primevue/useconfirm';
 import axios from '@/libs/axios';
+import { useUserStore } from '@/stores/userStore';
+
 
 const route = useRoute();
 const router = useRouter();
@@ -13,6 +15,9 @@ const confirm = useConfirm();
 const userId = computed(() => route.params.id);
 const isEditing = computed(() => userId.value !== undefined);
 const formTitle = computed(() => (isEditing.value ? 'Editar Usuário' : 'Criar Usuário'));
+
+const userStore = useUserStore();
+const isSuperAdmin = computed(() => userStore.isSuperAdmin);
 
 const name = ref('');
 const email = ref('');
@@ -55,6 +60,7 @@ onMounted(async () => {
         }
     }
 });
+
 
 const validateForm = () => {
     const errors = {};
@@ -175,6 +181,24 @@ const confirmDeleteGroup = (group) => {
         }
     });
 };
+
+// Suponha que você já tenha o papel do usuário logado
+// Exemplo: const currentUserRole = ref('admin'); // ou 'superadmin', etc.
+const currentUserRole = ref('admin'); // Troque para a fonte real do papel do usuário
+
+const roleOptions = computed(() => {
+    if (isSuperAdmin.value) {
+        return [
+            { label: 'Normal', value: 'normal' },
+            { label: 'Admin', value: 'admin' },
+            { label: 'Superadmin', value: 'superadmin' }
+        ];
+    }
+    return [
+        { label: 'Normal', value: 'normal' },
+        { label: 'Admin', value: 'admin' },
+    ];
+});
 </script>
 
 <template>
@@ -218,11 +242,7 @@ const confirmDeleteGroup = (group) => {
                                     <Dropdown
                                         id="role"
                                         v-model="role"
-                                        :options="[
-                                            { label: 'Normal', value: 'normal' },
-                                            { label: 'Admin', value: 'admin' },
-                                            { label: 'Superadmin', value: 'superadmin' }
-                                        ]"
+                                        :options="roleOptions"
                                         optionLabel="label"
                                         optionValue="value"
                                         placeholder="Selecione o perfil"
