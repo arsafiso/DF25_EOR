@@ -16,12 +16,12 @@ return new class extends Migration
             $table->enum('unidade_elevacao_base', ['mm','cm','dm','m','dam','hm','km'])->default('m')->after('elevacao_base');
             $table->enum('unidade_altura_maxima_federal', ['mm','cm','dm','m','dam','hm','km'])->default('m')->after('altura_maxima_federal');
             $table->enum('unidade_altura_maxima_estadual', ['mm','cm','dm','m','dam','hm','km'])->default('m')->after('altura_maxima_estadual');
-            $table->enum('unidade_area_reservatorio_crista', ['mm²','cm²','dm²','m²','dam²','hm²','km²','Km²'])->default('Km²')->after('area_reservatorio_crista');
-            $table->enum('unidade_area_reservatorio_soleira', ['mm²','cm²','dm²','m²','dam²','hm²','km²','Km²'])->default('Km²')->after('area_reservatorio_soleira');
+            $table->enum('unidade_area_reservatorio_crista', ['mm²','cm²','dm²','m²','dam²','hm²','km²'])->default('Km²')->after('area_reservatorio_crista');
+            $table->enum('unidade_area_reservatorio_soleira', ['mm²','cm²','dm²','m²','dam²','hm²','km²'])->default('Km²')->after('area_reservatorio_soleira');
             $table->enum('unidade_altura_maxima_entre_bermas', ['mm','cm','dm','m','dam','hm','km'])->default('m')->after('altura_maxima_entre_bermas');
             $table->enum('unidade_largura_bermas', ['mm','cm','dm','m','dam','hm','km'])->default('m')->after('largura_bermas');
-            $table->enum('unidade_area_bacia_contribuicao', ['mm²','cm²','dm²','m²','dam²','hm²','km²','Km²'])->default('km²')->after('area_bacia_contribuicao');
-            $table->enum('unidade_area_espelho_dagua', ['mm²','cm²','dm²','m²','dam²','hm²','km²','Km²'])->default('Km²')->after('area_espelho_dagua');
+            $table->enum('unidade_area_bacia_contribuicao', ['mm²','cm²','dm²','m²','dam²','hm²','km²'])->default('km²')->after('area_bacia_contribuicao');
+            $table->enum('unidade_area_espelho_dagua', ['mm²','cm²','dm²','m²','dam²','hm²','km²'])->default('Km²')->after('area_espelho_dagua');
             $table->enum('unidade_na_maximo_operacional', ['mm','cm','dm','m','dam','hm','km'])->default('m')->after('na_maximo_operacional');
             $table->enum('unidade_na_maximo_maximorum', ['mm','cm','dm','m','dam','hm','km'])->default('m')->after('na_maximo_maximorum');
             $table->enum('unidade_borda_livre', ['mm','cm','dm','m','dam','hm','km'])->default('m')->after('borda_livre');

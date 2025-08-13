@@ -42,7 +42,7 @@ onMounted(async () => {
             if (response.status === 200) {
                 name.value = response.data.name;
                 email.value = response.data.email;
-                role.value = !!response.data.role;
+                role.value = response.data.role;
                 companyId.value = response.data.company_id;
                 groups.value = response.data.grupos || [];
             } else {
