@@ -3,6 +3,8 @@ import { useAccessGroupStore } from '@/stores/accessGroupStore';
 import { useToast } from 'primevue/usetoast';
 import { computed, onMounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
+import axios from '@/libs/axios';
+import { useUserStore } from '@/stores/userStore';
 
 const router = useRouter();
 const accessGroupStore = useAccessGroupStore();
@@ -12,6 +14,35 @@ import { useConfirm } from 'primevue/useconfirm';
 const confirm = useConfirm();
 
 const searchQuery = ref('');
+
+// Modal de empresa para superadmin
+const showEmpresaModal = ref(false);
+const empresas = ref([]);
+const empresaSelecionada = ref(null);
+const empresaLoading = ref(false);
+
+const userStore = useUserStore();
+const isSuperAdmin = computed(() => userStore.isSuperAdmin);
+
+async function abrirModalEmpresa() {
+    empresaLoading.value = true;
+    try {
+        const response = await axios.get('/companies');
+        empresas.value = response.data;
+        showEmpresaModal.value = true;
+    } catch (e) {
+        toast.add({ severity: 'error', summary: 'Erro', detail: 'Falha ao carregar empresas', life: 3000 });
+    }
+    empresaLoading.value = false;
+}
+
+function confirmarEmpresa() {
+    if (empresaSelecionada.value) {
+        router.push({ path: '/access-groups/new', query: { empresaId: empresaSelecionada.value } });
+        showEmpresaModal.value = false;
+        empresaSelecionada.value = null;
+    }
+}
 
 const filters = computed(() => {
     const activeFilters = [];
@@ -33,7 +64,11 @@ watch(searchQuery, () => {
 });
 
 const createAccessGroup = () => {
-    router.push('/access-groups/new');
+    if (isSuperAdmin.value) {
+        abrirModalEmpresa();
+    } else {
+        router.push('/access-groups/new');
+    }
 };
 
 const editAccessGroup = (id) => {
@@ -96,6 +131,17 @@ const formatPermissions = (structures) => {
                         <Button label="Adicionar Grupo de Acesso" icon="pi pi-plus" severity="success" @click="createAccessGroup" />
                     </template>
                 </Toolbar>
+                <!-- Modal: seleção de empresa (superadmin) -->
+                <Dialog v-model:visible="showEmpresaModal" modal header="Selecione a Empresa" :closable="false" :style="{ width: '400px' }">
+                    <div v-if="empresaLoading" class="p-4 text-center">Carregando empresas...</div>
+                    <div v-else>
+                        <Select v-model="empresaSelecionada" :options="empresas" optionLabel="nome" optionValue="id" placeholder="Selecione uma empresa" class="w-full mb-3" />
+                        <div class="flex justify-end gap-2">
+                            <Button label="Cancelar" @click="showEmpresaModal = false; empresaSelecionada = null;" text />
+                            <Button label="Confirmar" @click="confirmarEmpresa" :disabled="!empresaSelecionada" />
+                        </div>
+                    </div>
+                </Dialog>
 
                 <DataTable
                     :value="accessGroupStore.paginatedAccessGroups"

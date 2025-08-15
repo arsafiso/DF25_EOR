@@ -3,6 +3,7 @@ import { useAccessGroupStore } from '@/stores/accessGroupStore';
 import { useToast } from 'primevue/usetoast';
 import { computed, onMounted, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+import { useUserStore } from '@/stores/userStore';
 
 import { useConfirm } from 'primevue/useconfirm';
 const confirm = useConfirm();
@@ -11,6 +12,10 @@ const route = useRoute();
 const router = useRouter();
 const accessGroupStore = useAccessGroupStore();
 const toast = useToast();
+
+const userStore = useUserStore();
+const isSuperAdmin = computed(() => userStore.isSuperAdmin);
+const empresaId = ref(null);
 
 // Dados do formulário
 const name = ref('');
@@ -44,6 +49,10 @@ onMounted(async () => {
         finalidade: structure.finalidade,
         nivel_acesso: structure.nivel_acesso || 'sem_nivel'
     }));
+
+    if (!isEditing.value && route.query.empresaId) {
+        empresaId.value = Number(route.query.empresaId);
+    }
 
     if (isEditing.value) {
         const accessGroup = await accessGroupStore.getAccessGroupById(accessGroupId.value);
@@ -145,7 +154,7 @@ const saveAccessGroup = async () => {
         return;
     }
 
-    const payload = {
+    let payload = {
         nome: name.value,
         descricao: description.value,
         estruturas: structures.value.map((structure) => ({
@@ -153,6 +162,10 @@ const saveAccessGroup = async () => {
             nivel_acesso: structure.nivel_acesso
         }))
     };
+
+    if (!isEditing.value && isSuperAdmin.value && empresaId.value) {
+        payload.company_id = empresaId.value;
+    }
 
     try {
         if (isEditing.value) {

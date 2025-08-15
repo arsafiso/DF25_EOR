@@ -18,7 +18,6 @@ class EstruturaController extends Controller
         if ($user->role == 'superadmin') {
             $estruturas = Estrutura::all();
         } else if ($user->role == 'admin') {
-            // Busca as estruturas da empresa do usuário
             $estruturas = Estrutura::where('company_id', $user->company_id)->get(); 
         }else {
             // Busca os IDs dos grupos do usuário
