@@ -234,19 +234,20 @@ const roleOptions = computed(() => {
                                     <small v-if="validationErrors.password" class="p-error">{{ validationErrors.password }}</small>
                                 </div>
                                 <div class="mb-4">
-                                    <label for="company" class="block mb-2">Empresa</label>
-                                    <Dropdown id="company" v-model="companyId" :options="companies" optionLabel="nome" optionValue="id" placeholder="Selecione a empresa" />
+                                        <label for="company" class="block mb-2">Empresa</label>
+                                        <Dropdown id="company" v-model="companyId" :options="companies" optionLabel="nome" optionValue="id" placeholder="Selecione a empresa" class="w-[220px]" />
                                 </div>
                                 <div class="mb-4">
-                                    <label for="role" class="block mb-2">Nível Acesso</label>
-                                    <Dropdown
-                                        id="role"
-                                        v-model="role"
-                                        :options="roleOptions"
-                                        optionLabel="label"
-                                        optionValue="value"
-                                        placeholder="Selecione o perfil"
-                                    />
+                                        <label for="role" class="block mb-2">Nível Acesso</label>
+                                        <Dropdown
+                                            id="role"
+                                            v-model="role"
+                                            :options="roleOptions"
+                                            optionLabel="label"
+                                            optionValue="value"
+                                            placeholder="Selecione o perfil"
+                                            class="w-[220px]"
+                                        />
                                 </div>
                             </TabPanel>
                             <TabPanel v-if="isEditing" value="1">

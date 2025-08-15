@@ -893,24 +893,30 @@ function formatDateTime(dateStr) {
                             </TabPanel>
                         </TabPanels>
                     </Tabs>
+                    
+                    <Tabs class="mb-4" style="margin-top: 2rem;">
+                        <TabPanels>
+                            <TabPanel>
+                                <!-- Botões de Exportar e Sair -->
+                                <div class="flex justify-content-end gap-3 mt-4">
+                                    <Button label="Exportar estrutura" icon="pi pi-download" class="p-button-primary" style="background-color: #2196F3; border-color: #2196F3;" @click="exportarEstrutura" type="button" />
+                                    <Button label="Sair" severity="secondary" outlined @click="cancel" type="button" v-if="!(isAdmin || isSuperAdmin || canEdit)" />
+                                </div>
 
-                    <!-- Botões de Exportar e Sair -->
-                    <div class="flex justify-content-end gap-3 mt-4">
-                        <Button label="Exportar estrutura" icon="pi pi-download" class="p-button-primary" style="background-color: #2196F3; border-color: #2196F3;" @click="exportarEstrutura" type="button" />
-                        <Button label="Sair" severity="secondary" outlined @click="cancel" type="button" v-if="!(isAdmin || isSuperAdmin || canEdit)" />
-                    </div>
+                                <!-- Campo de Justificativa -->
+                                <div v-if="isAdmin || isSuperAdmin || canEdit" class="mt-4">
+                                    <label for="justificativa" class="block mb-2 font-semibold">Justificativa da Modificação <span style="color: red;">*Obrigatório</span>
+                                    </label><Textarea v-model="justificativa" id="justificativa" rows="3" placeholder="Informe a justificativa para a modificação" class="w-full" />
+                                </div> 
 
-                    <!-- Campo de Justificativa -->
-                    <div v-if="isAdmin || isSuperAdmin || canEdit" class="mt-4">
-                        <label for="justificativa" class="block mb-2 font-semibold">Justificativa da Modificação <span style="color: red;">*Obrigatório</span>
-                        </label><Textarea v-model="justificativa" id="justificativa" rows="3" placeholder="Informe a justificativa para a modificação" class="w-full" />
-                    </div> 
-
-                    <!-- Botões de Cancelar e Salvar -->
-                    <div v-if="isAdmin || isSuperAdmin || canEdit" class="flex justify-end gap-3 mt-4">
-                        <Button label="Cancelar" severity="secondary" outlined @click="cancel" type="button" />
-                        <Button label="Salvar" icon="pi pi-save" type="submit" />
-                    </div>
+                                <!-- Botões de Cancelar e Salvar -->
+                                <div v-if="isAdmin || isSuperAdmin || canEdit" class="flex justify-end gap-3 mt-4">
+                                    <Button label="Cancelar" severity="secondary" outlined @click="cancel" type="button" />
+                                    <Button label="Salvar" icon="pi pi-save" type="submit" />
+                                </div>
+                            </TabPanel>
+                        </TabPanels>
+                    </Tabs>
                 </form>
             </template>
         </Card>

@@ -6,6 +6,7 @@ use App\Models\GrupoAcesso;
 use App\Models\GrupoEstruturaAcesso;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+//use Illuminate\Support\Facades\Log;
 
 class GrupoAcessoController extends Controller
 {
@@ -52,7 +53,13 @@ class GrupoAcessoController extends Controller
 
         try {
             $user = Auth::user();
-            if (!$user->company_id) {
+            // Permite superadmin criar grupo para qualquer empresa
+            //Log::info('Payload recebido para grupo de acesso:', $request->all());
+            $companyId = ($user->role === 'superadmin' && $request->input('company_id'))
+                ? $request->input('company_id')
+                : $user->company_id;
+            //Log::info('Company ID atribuído ao grupo:', ['company_id' => $companyId, 'user_id' => $user->id, 'role' => $user->role]);
+            if (!$companyId) {
                 return response()->json(['error' => 'Usuário não associado a uma empresa.'], 200);
             }
 
@@ -60,7 +67,7 @@ class GrupoAcessoController extends Controller
             $grupo = GrupoAcesso::create([
                 'nome' => $validated['nome'],
                 'descricao' => $validated['descricao'] ?? null,
-                'company_id' => $user->company_id,
+                'company_id' => $companyId,
             ]);
 
             // Verifica se há estruturas para associar

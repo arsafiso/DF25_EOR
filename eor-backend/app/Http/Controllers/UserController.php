@@ -85,7 +85,7 @@ class UserController extends Controller
 
     public function show($id)
     {
-        $user = User::find($id);
+        $user = User::with('grupos')->find($id);
 
         if (!$user) {
             return response()->json(['error' => 'Usuário não encontrado'], 404);

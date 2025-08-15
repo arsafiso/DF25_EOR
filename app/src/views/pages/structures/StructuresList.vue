@@ -11,7 +11,7 @@ import { useRouter } from 'vue-router';
 const router = useRouter();
 const structureStore = useStructureStore();
 const userStore = useUserStore();
-const { statusOptions, cdaClassificationOptions } = structureStore;
+const { statusOptions, federalClassificationOptions } = structureStore;
 const toast = useToast();
 
 const confirm = useConfirm();
@@ -19,20 +19,16 @@ const confirm = useConfirm();
 const searchQuery = ref('');
 const selectedStatus = ref(null);
 const selectedClassification = ref(null);
+const selectedEmpresa = ref(null);
 
-const isAdmin = computed(() => {
-    return userStore.isAdmin;
-});
-
-const isSuperAdmin = computed(() => {
-    return userStore.isSuperAdmin;
-});
+const isAdmin = computed(() => userStore.isAdmin);
+const isSuperAdmin = computed(() => userStore.isSuperAdmin);
 
 const filters = computed(() => {
     const activeFilters = [];
 
     if (searchQuery.value) {
-        activeFilters.push({ field: 'purpose', operator: 'contains', value: searchQuery.value });
+        activeFilters.push({ field: 'finalidade', operator: 'contains', value: searchQuery.value });
     }
 
     if (selectedStatus.value) {
@@ -40,26 +36,70 @@ const filters = computed(() => {
     }
 
     if (selectedClassification.value) {
-        activeFilters.push({ field: 'federal_classification', operator: 'eq', value: selectedClassification.value });
+        activeFilters.push({ field: 'classificacao_federal', operator: 'eq', value: selectedClassification.value });
+    }
+
+    if (selectedEmpresa.value) {
+        activeFilters.push({ field: 'company_id', operator: 'eq', value: selectedEmpresa.value });
     }
 
     return activeFilters;
 });
 
-// Fetch structures on mount
-onMounted(() => {
-    structureStore.fetchStructures();
+const filteredStructuresLocal = computed(() => {
+    return structureStore.structures.filter(structure => {
+        const finalidadeMatch = searchQuery.value
+            ? (structure.finalidade || '').toLowerCase().includes(searchQuery.value.toLowerCase())
+            : true;
+        const statusMatch = selectedStatus.value
+            ? structure.status === selectedStatus.value
+            : true;
+        const classificacaoMatch = selectedClassification.value
+            ? structure.classificacao_federal === selectedClassification.value
+            : true;
+        const empresaMatch = selectedEmpresa.value
+            ? structure.company_id === selectedEmpresa.value
+            : true;
+        return finalidadeMatch && statusMatch && classificacaoMatch && empresaMatch;
+    });
 });
 
+// Mapeamento de empresas para exibir nome na tabela e para filtro
+const empresasMap = ref({});
+const empresasOptions = ref([]);
+
+async function fetchEmpresasMap() {
+    try {
+        const response = await axios.get('/companies');
+        // Cria um map id -> nome
+        empresasMap.value = Object.fromEntries(response.data.map(e => [e.id, e.nome]));
+        // Cria opções para filtro
+        empresasOptions.value = response.data.map(e => ({ label: e.nome, value: e.id }));
+    } catch (e) {
+        empresasMap.value = {};
+        empresasOptions.value = [];
+    }
+}
+
+onMounted(() => {
+    structureStore.fetchStructures();
+    fetchEmpresasMap();
+});
+
+watch(isSuperAdmin, (val) => {
+    if (val) fetchEmpresasMap();
+});
+
+
 // Watch for filter changes
-watch([searchQuery, selectedStatus, selectedClassification], () => {
-    structureStore.clearFilters();
-    filters.value.forEach((filter) => structureStore.addFilter(filter));
+watch([searchQuery, selectedStatus, selectedClassification, selectedEmpresa], () => {
+    structureStore.filters = [...filters.value];
+    structureStore.pagination.page = 1;
 });
 
 // Create a new structure
 
-// Seleção de empresa para superadmin
+// Seleção de empresa para superadmin e filtro
 const showEmpresaModal = ref(false);
 const empresas = ref([]);
 const empresaSelecionada = ref(null);
@@ -67,13 +107,15 @@ const empresaLoading = ref(false);
 
 async function abrirModalEmpresa() {
     empresaLoading.value = true;
-    try {
-        const response = await axios.get('/companies');
-        empresas.value = response.data;
-        showEmpresaModal.value = true;
-    } catch (e) {
-        toast.add({ severity: 'error', summary: 'Erro', detail: 'Falha ao carregar empresas', life: 3000 });
+    if (!empresas.value.length) {
+        try {
+            const response = await axios.get('/companies');
+            empresas.value = response.data;
+        } catch (e) {
+            toast.add({ severity: 'error', summary: 'Erro', detail: 'Falha ao carregar empresas', life: 3000 });
+        }
     }
+    showEmpresaModal.value = true;
     empresaLoading.value = false;
 }
 
@@ -136,7 +178,8 @@ const getStatusSeverity = (status) => {
                         <div class="flex flex-wrap gap-2">
                             <InputText v-model="searchQuery" placeholder="Buscar estruturas..." class="p-inputtext-sm" />
                             <Select v-model="selectedStatus" :options="statusOptions" optionLabel="label" optionValue="value" placeholder="Filtrar por status" class="p-inputtext-sm" :showClear="true" />
-                            <Select v-model="selectedClassification" :options="cdaClassificationOptions" optionLabel="label" optionValue="value" placeholder="Filtrar por classificação" class="p-inputtext-sm" :showClear="true" />
+                            <Select v-model="selectedClassification" :options="federalClassificationOptions" optionLabel="label" optionValue="value" placeholder="Filtrar por classificação federal" class="p-inputtext-sm" :showClear="true" />
+                            <Select v-model="selectedEmpresa" :options="empresasOptions" optionLabel="label" optionValue="value" placeholder="Filtrar por empresa" class="p-inputtext-sm" :showClear="true" v-if="isSuperAdmin" />
                         </div>
                     </template>
                     <template #end>
@@ -156,10 +199,10 @@ const getStatusSeverity = (status) => {
         </Dialog>
 
                 <DataTable
-                    :value="structureStore.paginatedStructures"
+                    :value="filteredStructuresLocal"
                     :paginator="true"
                     :rows="structureStore.pagination.perPage"
-                    :totalRecords="structureStore.pagination.total"
+                    :totalRecords="filteredStructuresLocal.length"
                     :loading="structureStore.loading"
                     paginatorTemplate="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink RowsPerPageDropdown"
                     :rowsPerPageOptions="[5, 10, 25, 50]"
@@ -181,6 +224,12 @@ const getStatusSeverity = (status) => {
                         </template>
                     </Column>
                     <Column field="classificacao_federal" header="Classificação Federal" sortable> </Column>
+                    <!-- Coluna Empresa para superadmin -->
+                    <Column v-if="isSuperAdmin" header="Empresa" sortable>
+                        <template #body="{ data }">
+                            {{ empresasMap[data.company_id] || '-' }}
+                        </template>
+                    </Column>
                     <Column header="Ações" style="width: 15rem">
                         <template #body="{ data }">
                             <div class="flex gap-2">
