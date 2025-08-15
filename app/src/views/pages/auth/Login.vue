@@ -16,19 +16,26 @@ const validationErrors = ref({});
 
 const login = async () => {
     try {
-        await axios.post('/login', {
+        const response = await axios.post('/auth/login', {
+            // external_token: password.value
             email: email.value,
             password: password.value
         });
-        // Redireciona ou faz o que precisa após login bem-sucedido
-    } catch (e) {
-        // Se o backend retornar erro de senha, mostre a mensagem personalizada
-            validationErrors.value.password = 'E-mail ou senha incorretos. Tente novamente.';
+
+         const { token, user } = response?.data || {};
+        if (token) {
+            localStorage.setItem('eor__token', token);
+            userStore.setUser(user);
+            router.push('/');
+        }
+    }  catch (e) {
+        validationErrors.value.password = 'E-mail ou senha incorretos. Tente novamente.';
     }
+};
+
     watch([email, password], () => {
         validationErrors.value.password = '';
-    });
-};
+});
 </script>
 
 <template>
