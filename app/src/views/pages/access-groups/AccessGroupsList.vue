@@ -102,12 +102,17 @@ const formatPermissions = (structures) => {
         leitura_escrita: 0
     };
 
+    if (!Array.isArray(structures)) return counts;
+
     structures.forEach((structure) => {
-        counts[structure.nivel_acesso] += 1;
+        if (counts[structure.nivel_acesso] !== undefined) {
+            counts[structure.nivel_acesso] += 1;
+        }
     });
 
     return counts;
 };
+
 </script>
 
 <template>

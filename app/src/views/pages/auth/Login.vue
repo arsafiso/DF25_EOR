@@ -2,7 +2,7 @@
 import axios from '@/libs/axios';
 import { useUserStore } from '@/stores/userStore';
 
-import { ref } from 'vue';
+import { ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 
 const userStore = useUserStore();
@@ -12,6 +12,7 @@ const router = useRouter();
 const email = ref('');
 const password = ref('');
 const checked = ref(false);
+const validationErrors = ref({});
 
 const login = async () => {
     try {
@@ -21,19 +22,20 @@ const login = async () => {
             password: password.value
         });
 
-        const { token, user } = response?.data || {};
-
+         const { token, user } = response?.data || {};
         if (token) {
             localStorage.setItem('eor__token', token);
-
             userStore.setUser(user);
-
             router.push('/');
         }
-    } catch (error) {
-        console.error('Login failed:', error);
+    }  catch (e) {
+        validationErrors.value.password = 'E-mail ou senha incorretos. Tente novamente.';
     }
 };
+
+    watch([email, password], () => {
+        validationErrors.value.password = '';
+});
 </script>
 
 <template>
@@ -51,6 +53,7 @@ const login = async () => {
 
                         <label for="password" class="block text-surface-900 font-medium text-xl mb-2">Senha</label>
                         <Password id="password" v-model="password" placeholder="Password" :toggleMask="true" class="mb-4" fluid :feedback="false"></Password>
+                        <span v-if="validationErrors.password" class="text-red-500 text-sm mb-4">{{ validationErrors.password }}</span>
 
                         <div class="flex items-center justify-between mt-2 mb-8 gap-8">
                             <div class="flex items-center">
