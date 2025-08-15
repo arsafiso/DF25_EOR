@@ -38,7 +38,9 @@ onMounted(async () => {
     companies.value = Array.isArray(companiesResponse.data) ? companiesResponse.data : [];
 
     // Carrega todos os grupos de acesso
-    const groupsResponse = await axios.get('/grupos-acesso');
+    const groupsResponse = await axios.get('/grupos-acesso', {
+        params: { company_id: companyId.value }
+    });
     allGroups.value = Array.isArray(groupsResponse.data.data) ? groupsResponse.data.data : [];
 
     if (isEditing.value) {
@@ -143,8 +145,10 @@ const breadcrumbItems = ref([
 ]);
 
 const filteredGroups = computed(() => {
-    console.log('filtered', allGroups.value);
-    return allGroups.value;
+    if (isSuperAdmin.value) {
+        return allGroups.value;
+    }
+    return allGroups.value.filter(g => g.company_id === companyId.value);
 });
 
 const addGroup = () => {
@@ -199,6 +203,15 @@ const roleOptions = computed(() => {
         { label: 'Admin', value: 'admin' },
     ];
 });
+
+// Exemplo para filtrar empresas apenas se não for superadmin
+const filteredCompanies = computed(() => {
+    if (isSuperAdmin.value) {
+        return companies.value;
+    }
+    // Supondo que userStore.companyId seja a empresa do usuário
+    return companies.value.filter(c => c.id === userStore.companyId);
+});
 </script>
 
 <template>
@@ -235,7 +248,7 @@ const roleOptions = computed(() => {
                                 </div>
                                 <div class="mb-4">
                                     <label for="company" class="block mb-2">Empresa</label>
-                                    <Dropdown id="company" v-model="companyId" :options="companies" optionLabel="nome" optionValue="id" placeholder="Selecione a empresa" />
+                                    <Dropdown id="company" v-model="companyId" :options="filteredCompanies" optionLabel="nome" optionValue="id" placeholder="Selecione a empresa" />
                                 </div>
                                 <div class="mb-4">
                                     <label for="role" class="block mb-2">Nível Acesso</label>
