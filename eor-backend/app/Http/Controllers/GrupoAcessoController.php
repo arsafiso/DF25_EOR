@@ -15,27 +15,18 @@ class GrupoAcessoController extends Controller
      */
     public function index()
     {
-        try {
-            $user = Auth::user();
-            if ($user->role == 'superadmin') {
-                $grupos = GrupoAcesso::with('estruturas')->get();
-            } else {
-                // Busca os grupos de acesso do mesmo company_id do usuário autenticado
-                $grupos = GrupoAcesso::where('company_id', $user->company_id)
-                    ->with('estruturas')
-                    ->get();
-            }
+        $user = auth()->user();
 
-            return response()->json([
-                'message' => 'Grupos de acesso listados com sucesso!',
-                'data' => $grupos,
-            ], 200);
-        } catch (\Exception $e) {
-            return response()->json([
-                'message' => 'Erro ao listar grupos de acesso.',
-                'error' => $e->getMessage(),
-            ], 500);
+        if ($user->role === 'superadmin') {
+            $grupos = GrupoAcesso::all();
+        } else {
+            $grupos = GrupoAcesso::where('company_id', $user->company_id)->get();
         }
+
+        return response()->json([
+            'message' => 'Grupos de acesso listados com sucesso!',
+            'data' => $grupos,
+        ], 200);
     }
 
     /**

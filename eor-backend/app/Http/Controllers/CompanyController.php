@@ -12,13 +12,15 @@ class CompanyController extends Controller
     // Listar todas as empresas
     public function index()
     {
-        $user = Auth::user();
-        if ($user && $user->role === 'superadmin') {
-            return response()->json(Company::all());
-            
+        $user = auth()->user();
+
+        if ($user->role === 'superadmin') {
+            $empresas = Company::all();
+        } else {
+            $empresas = Company::where('id', $user->company_id)->get();
         }
-        $company = Company::where('id', $user->company_id)->get();
-        return response()->json($company);
+
+        return response()->json($empresas);
     }
 
     // Criar nova empresa
