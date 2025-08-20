@@ -12,6 +12,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('estruturas', function (Blueprint $table) {
+                $table->string('nome', 255)->nullable()->after('id');
             $table->enum('unidade_elevacao_crista', ['mm','cm','dm','m','dam','hm','km'])->default('m')->after('elevacao_crista');
             $table->enum('unidade_elevacao_base', ['mm','cm','dm','m','dam','hm','km'])->default('m')->after('elevacao_base');
             $table->enum('unidade_altura_maxima_federal', ['mm','cm','dm','m','dam','hm','km'])->default('m')->after('altura_maxima_federal');

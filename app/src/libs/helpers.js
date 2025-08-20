@@ -29,7 +29,12 @@ export const makeApiRequest = async ({ url, method = 'get', params = {}, request
         const response = await axios(config);
         data.value = response.data;
     } catch (err) {
-        error.value = err;
+        
+        if (err.response) {
+            error.value = err;
+        } else {
+            error.value = err;
+        }
     } finally {
         loading.value = false;
     }

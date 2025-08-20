@@ -38,17 +38,20 @@ onMounted(async () => {
         allUsers.value = response.map((user) => ({
             id: user.id,
             name: user.name,
-            email: user.email
+            email: user.email,
+            company_id: user.company_id 
         }));
     });
 
     const structuresResponse = await accessGroupStore.getStructureOptions();
-    const mappedStructures = structuresResponse.map((structure) => ({
-        id: structure.id,
-        estrutura_id: structure.id,
-        finalidade: structure.finalidade,
-        nivel_acesso: structure.nivel_acesso || 'sem_nivel'
-    }));
+
+    // Função para filtrar estruturas conforme company_id
+    function filterStructuresByCompany(structures, companyId) {
+        if (isSuperAdmin.value && companyId) {
+            return structures.filter(s => s.company_id === companyId);
+        }
+        return structures;
+    }
 
     if (!isEditing.value && route.query.empresaId) {
         empresaId.value = Number(route.query.empresaId);
@@ -60,19 +63,22 @@ onMounted(async () => {
         if (accessGroup) {
             name.value = accessGroup.nome;
             description.value = accessGroup.descricao;
-            structures.value = accessGroup.estruturas;
 
-            // Mapeia as estruturas combinando os dados existentes com o acesso do grupo
-            structures.value = mappedStructures.reduce((result, structure) => {
+            // Primeiro mapeia as estruturas combinando os dados existentes com o acesso do grupo
+            const mappedStructures = structuresResponse.map((structure) => {
                 const existingStructure = accessGroup.estruturas.find((s) => s.estrutura_id === structure.id);
+                return {
+                    id: structure.id,
+                    estrutura_id: structure.id,
+                        nome: structure.nome,
+                    company_id: structure.company_id,
+                    nivel_acesso: existingStructure?.nivel_acesso || structure.nivel_acesso || 'sem_nivel'
+                };
+            });
 
-                result.push({
-                    ...structure,
-                    nivel_acesso: existingStructure?.nivel_acesso || structure.nivel_acesso
-                });
-
-                return result;
-            }, []);
+            // Depois filtra pelo company_id do grupo de acesso
+            const filteredStructures = filterStructuresByCompany(mappedStructures, accessGroup.company_id);
+            structures.value = filteredStructures;
 
             users.value = (await accessGroupStore.getUsersByAccessGroupId(accessGroupId.value)) || [];
         } else {
@@ -85,7 +91,14 @@ onMounted(async () => {
             router.push('/access-groups');
         }
     } else {
-        structures.value = mappedStructures;
+        // Criação: filtra pelo empresaId selecionado
+        const filteredStructures = filterStructuresByCompany(structuresResponse, empresaId.value);
+            structures.value = filteredStructures.map((structure) => ({
+                id: structure.id,
+                estrutura_id: structure.id,
+                nome: structure.nome,
+                nivel_acesso: structure.nivel_acesso || 'sem_nivel'
+            }));
     }
 });
 
@@ -106,8 +119,14 @@ const validateForm = async () => {
 const selectedUser = ref(null);
 const openUserDialog = ref(false);
 const filteredUsers = computed(() => {
+    // Descobre o company_id do grupo (criação ou edição)
+    const groupCompanyId = isEditing.value
+        ? (accessGroupStore.accessGroups.find(g => g.id == accessGroupId.value)?.company_id)
+        : empresaId.value;
+
     return allUsers.value.filter((user) => {
-        return !users.value.some((u) => u.id === user.id);
+        // Só mostra usuários da mesma empresa e que ainda não estão no grupo
+        return user.company_id === groupCompanyId && !users.value.some((u) => u.id === user.id);
     });
 });
 
@@ -267,7 +286,7 @@ const confirmDeleteUser = (user) => {
                                     <Column field="structure" header="Estrutura">
                                         <template #body="{ data, index }">
                                             <Chip class="bg-primary-50 text-primary-700 font-medium">
-                                                {{ data.finalidade }}
+                                                {{ data.nome }}
                                             </Chip>
                                         </template>
                                     </Column>

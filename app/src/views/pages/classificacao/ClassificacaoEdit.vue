@@ -1,49 +1,38 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+
 import { useRoute, useRouter } from 'vue-router';
+import { ref, computed, onMounted } from 'vue';
 import { useToast } from 'primevue/usetoast';
-import { useConfirm } from 'primevue/useconfirm';
 import axios from '@/libs/axios';
 
 const route = useRoute();
 const router = useRouter();
 const toast = useToast();
-const confirm = useConfirm();
 
-const companyId = computed(() => route.params.id);
-const isEditing = computed(() => companyId.value !== undefined);
-const formTitle = computed(() => (isEditing.value ? 'Editar Classificação' : 'Criar Classificação Estadual'));
+const classificacaoId = computed(() => route.params.id);
+const isEditing = computed(() => classificacaoId.value !== undefined);
+const formTitle = computed(() => (isEditing.value ? 'Editar Classificação' : 'Criar Classificação'));
 
 const nome = ref('');
+const tipo = ref('estadual');
 const descricao = ref('');
 const validationErrors = ref({});
-
-// Usuários relacionados à empresa
-const users = ref([]);
-const allUsers = ref([]);
-const selectedUser = ref(null);
-const openUserDialog = ref(false);
 
 onMounted(async () => {
     if (isEditing.value) {
         try {
-            const response = await axios.get(`/companies/${companyId.value}`);
+            const response = await axios.get(`/classificacao-estrutura/${classificacaoId.value}`);
             if (response.status === 200) {
                 nome.value = response.data.nome;
+                tipo.value = response.data.tipo;
                 descricao.value = response.data.descricao;
             } else {
                 toast.add({ severity: 'error', summary: 'Erro', detail: 'Classificação não encontrada', life: 3000 });
-                router.push('/estadual');
+                router.push('/classificacao');
             }
-            // Carrega usuários da empresa
-            const usersResponse = await axios.get(`/companies/${companyId.value}/users`);
-            users.value = usersResponse.data || [];
-            // Carrega todos os usuários disponíveis para adicionar
-            const allUsersResponse = await axios.get('/users');
-            allUsers.value = Array.isArray(allUsersResponse.data.data) ? allUsersResponse.data.data : [];
         } catch (e) {
             toast.add({ severity: 'error', summary: 'Erro', detail: 'Falha ao carregar Classificação', life: 3000 });
-            router.push('/estadual');
+            router.push('/classificacao');
         }
     }
 });
@@ -51,15 +40,18 @@ onMounted(async () => {
 const validateForm = () => {
     const errors = {};
     if (!nome.value || nome.value.trim() === '') {
-        errors.nome = 'O nome da Classificação Estadual é obrigatório';
+        errors.nome = 'O nome da Classificação é obrigatório';
     } else if (nome.value.length < 3) {
         errors.nome = 'O nome deve ter pelo menos 3 caracteres';
+    }
+    if (!tipo.value || (tipo.value !== 'estadual' && tipo.value !== 'federal')) {
+        errors.tipo = 'Selecione o tipo: federal ou estadual';
     }
     validationErrors.value = errors;
     return Object.keys(errors).length === 0;
 };
 
-const saveCompany = async () => {
+const saveClassificacao = async () => {
     if (!validateForm()) {
         toast.add({
             severity: 'error',
@@ -72,33 +64,34 @@ const saveCompany = async () => {
 
     const payload = {
         nome: nome.value,
+        tipo: tipo.value,
         descricao: descricao.value
     };
 
     try {
         if (isEditing.value) {
-            const response = await axios.put(`/companies/${companyId.value}`, payload);
+            const response = await axios.put(`/classificacao-estrutura/${classificacaoId.value}`, payload);
             if (response.status === 200) {
                 toast.add({
                     severity: 'success',
                     summary: 'Sucesso',
-                    detail: 'Classificação Estadual atualizada com sucesso',
+                    detail: 'Classificação atualizada com sucesso',
                     life: 3000
                 });
-                router.push('/estadual');
+                router.push('/classificacao');
             } else {
                 toast.add({ severity: 'error', summary: 'Erro', detail: 'Erro ao atualizar Classificação', life: 3000 });
             }
         } else {
-            const response = await axios.post('/companies', payload);
+            const response = await axios.post('/classificacao-estrutura', payload);
             if (response.status === 201 || response.status === 200) {
                 toast.add({
                     severity: 'success',
                     summary: 'Sucesso',
-                    detail: 'Classificação Estadual criada com sucesso',
+                    detail: 'Classificação criada com sucesso',
                     life: 3000
                 });
-                router.push('/estadual');
+                router.push('/classificacao');
             } else {
                 toast.add({ severity: 'error', summary: 'Erro', detail: 'Erro ao criar Classificação', life: 3000 });
             }
@@ -108,14 +101,15 @@ const saveCompany = async () => {
     }
 };
 
+
 const cancel = () => {
-    router.push('/estadual');
+    router.push('/classificacao');
 };
 
 const breadcrumbItems = ref([
     { label: 'Dashboard', url: '/' },
-    { label: 'Empresas', url: '/companies' },
-    { label: isEditing.value ? 'Editar Classificação' : 'Criar Classificação Estadual', url: null }
+    { label: 'Classificações', url: '/classificacao' },
+    { label: isEditing.value ? 'Editar Classificação' : 'Criar Classificação', url: null }
 ]);
 
 // Usuários - Aba
@@ -168,7 +162,7 @@ const confirmDeleteUser = (user) => {
 </script>
 
 <template>
-    <div class="companies-edit p-4">
+    <div class="classificacao-edit p-4">
         <div>
             <h1 class="text-3xl font-medium text-900 m-0">{{ formTitle }}</h1>
             <Breadcrumb :model="breadcrumbItems" class="my-6 text-sm rounded-lg" />
@@ -177,69 +171,30 @@ const confirmDeleteUser = (user) => {
         <Card class="mb-4">
             <template #content>
                 <form class="p-fluid">
-                    <Tabs value="0">
-                        <TabList>
-                            <Tab value="0">Informações</Tab>
-                            <Tab v-if="isEditing" value="1">Usuários</Tab>
-                        </TabList>
-                        <TabPanels>
-                            <TabPanel value="0">
-                                <div class="col-span-12 md:col-span-6 mb-4">
-                                    <label for="nome" class="block mb-2">Nome</label>
-                                    <InputText fluid id="nome" v-model="nome" :class="{ 'p-invalid': validationErrors.nome }" />
-                                    <small v-if="validationErrors.nome" class="p-error text-red-500">{{ validationErrors.nome }}</small>
-                                </div>
-                                <div class="col-span-12 mb-4">
-                                    <label for="descricao" class="block mb-2">Descrição</label>
-                                    <Textarea fluid id="descricao" v-model="descricao" rows="3" :class="{ 'p-invalid': validationErrors.descricao }" />
-                                    <small v-if="validationErrors.descricao" class="p-error">{{ validationErrors.descricao }}</small>
-                                </div>
-                            </TabPanel>
-                            <TabPanel v-if="isEditing" value="1">
-                                <div class="grid mb-4">
-                                    <div class="col-span-6">
-                                        <Button icon="pi pi-plus" label="Adicionar Usuário" class="mt-2" @click="addUser" />
-                                    </div>
-                                </div>
-                                <DataTable :value="users" responsiveLayout="scroll" class="p-datatable-sm" stripedRows>
-                                    <Column field="name" header="Nome">
-                                        <template #body="slotProps">
-                                            {{ slotProps.data.name || slotProps.data.nome }}
-                                        </template>
-                                    </Column>
-                                    <Column field="email" header="Email" />
-                                    <Column header="Ações" style="width: 8rem">
-                                        <template #body="slotProps">
-                                            <Button icon="pi pi-trash" @click="confirmDeleteUser(slotProps.data)" severity="danger" />
-                                        </template>
-                                    </Column>
-                                </DataTable>
-                            </TabPanel>
-                        </TabPanels>
-                    </Tabs>
+                    <div class="col-span-12 md:col-span-6 mb-4">
+                        <label for="nome" class="block mb-2">Nome</label>
+                        <InputText fluid id="nome" v-model="nome" :class="{ 'p-invalid': validationErrors.nome }" />
+                        <small v-if="validationErrors.nome" class="p-error text-red-500">{{ validationErrors.nome }}</small>
+                    </div>
+                    <div class="col-span-12 md:col-span-6 mb-4">
+                        <label for="tipo" class="block mb-2">Tipo</label>
+                        <Dropdown id="tipo" v-model="tipo" :options="[{ label: 'Federal', value: 'federal' }, { label: 'Estadual', value: 'estadual' }]" optionLabel="label" optionValue="value" placeholder="Selecione o tipo" />
+                        <small v-if="validationErrors.tipo" class="p-error text-red-500">{{ validationErrors.tipo }}</small>
+                    </div>
+                    <div class="col-span-12 mb-4">
+                        <label for="descricao" class="block mb-2">Descrição</label>
+                        <Textarea fluid id="descricao" v-model="descricao" rows="3" :class="{ 'p-invalid': validationErrors.descricao }" />
+                        <small v-if="validationErrors.descricao" class="p-error">{{ validationErrors.descricao }}</small>
+                    </div>
                 </form>
             </template>
             <template #footer>
                 <div class="flex justify-content-end gap-3">
                     <Button label="Cancelar" severity="secondary" outlined @click="cancel" type="button" />
-                    <Button label="Salvar" icon="pi pi-save" type="button" @click="saveCompany" />
+                    <Button label="Salvar" icon="pi pi-save" type="button" @click="saveClassificacao" />
                 </div>
             </template>
         </Card>
-
-        <Dialog v-model:visible="openUserDialog" :header="`Adicionar Usuário`" :modal="true" :style="{ width: '20vw' }" :draggable="false">
-            <div class="grid">
-                <div class="col-span-12 mb-4">
-                    <label for="user" class="block mb-2">Usuário</label>
-                    <Select filter fluid id="user" v-model="selectedUser" :options="filteredUsers" optionLabel="name" placeholder="Selecione um usuário" />
-                    <small v-if="validationErrors.user" class="block text-red-500 mt-2">{{ validationErrors.user }}</small>
-                </div>
-            </div>
-            <div class="flex justify-end gap-2">
-                <Button type="button" label="Cancelar" severity="secondary" @click="openUserDialog = false"></Button>
-                <Button type="button" label="Adicionar" icon="pi pi-plus" @click="saveUser" />
-            </div>
-        </Dialog>
     </div>
 </template>
 

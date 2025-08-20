@@ -15,43 +15,43 @@ const confirm = useConfirm();
 const isSuperAdmin = computed(() => userStore.isSuperAdmin);
 
 const searchQuery = ref('');
-const companies = ref([]);
+const classificacoes = ref([]);
 const loading = ref(false);
 const pagination = ref({ page: 1, perPage: 10, total: 0 });
 
-const filteredCompanies = computed(() => {
-  if (!searchQuery.value) return companies.value;
-  return companies.value.filter(c =>
+const filteredClassificacoes = computed(() => {
+  if (!searchQuery.value) return classificacoes.value;
+  return classificacoes.value.filter(c =>
     c.nome.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
     (c.descricao || '').toLowerCase().includes(searchQuery.value.toLowerCase())
   );
 });
 
-async function fetchCompanies() {
+async function fetchClassificacoes() {
   loading.value = true;
   try {
-    const response = await axios.get('/companies');
-    companies.value = response.data;
-    pagination.value.total = response.data.length;
+    const response = await axios.get('/classificacao-estrutura');
+    classificacoes.value = Array.isArray(response.data) ? response.data : (response.data.data || []);
+    pagination.value.total = classificacoes.value.length;
   } catch (e) {
-    toast.add({ severity: 'error', summary: 'Erro', detail: 'Falha ao carregar empresas', life: 3000 });
+    toast.add({ severity: 'error', summary: 'Erro', detail: 'Falha ao carregar classificações', life: 3000 });
   }
   loading.value = false;
 }
 
-onMounted(fetchCompanies);
+onMounted(fetchClassificacoes);
 
-function createCompany() {
-  router.push('/federal/new');
+function createClassificacao() {
+  router.push('/classificacao/new');
 }
 
-function editCompany(id: number) {
-  router.push(`/federal/${id}`);
+function editClassificacao(id: number) {
+  router.push(`/classificacao/${id}`);
 }
 
-function deleteCompany(id: number) {
+function deleteClassificacao(id: number) {
   confirm.require({
-    message: `Você tem certeza que deseja excluir esta empresa?`,
+    message: `Você tem certeza que deseja excluir esta Classificação?`,
     acceptLabel: 'Sim, excluir',
     rejectLabel: 'Não, cancelar',
     header: 'Confirmação',
@@ -59,11 +59,11 @@ function deleteCompany(id: number) {
     acceptClass: 'p-button-danger',
     accept: async () => {
       try {
-        await axios.delete(`/companies/${id}`);
-        toast.add({ severity: 'success', summary: 'Sucesso', detail: 'Classificação federal removida', life: 3000 });
-        fetchCompanies();
+        await axios.delete(`/classificacao-estrutura/${id}`);
+        toast.add({ severity: 'success', summary: 'Sucesso', detail: 'Classificação removida', life: 3000 });
+        fetchClassificacoes();
       } catch (e) {
-        toast.add({ severity: 'error', summary: 'Erro', detail: 'Erro ao remover empresa', life: 3000 });
+        toast.add({ severity: 'error', summary: 'Erro', detail: 'Erro ao remover classificação', life: 3000 });
       }
     }
   });
@@ -73,7 +73,7 @@ function deleteCompany(id: number) {
 
 <template>
   <div class="companies-list p-4">
-    <h1>Lista de Classificações Federais</h1>
+    <h1>Lista de Classificações das Estruturas</h1>
     <Card class="mb-4">
       <template #content>
         <Toolbar class="mb-4">
@@ -83,11 +83,11 @@ function deleteCompany(id: number) {
             </div>
           </template>
           <template #end>
-            <Button label="Criar Classificação" icon="pi pi-plus" severity="success" @click="createCompany" v-if="isSuperAdmin" />
+            <Button label="Criar Classificação" icon="pi pi-plus" severity="success" @click="createClassificacao" v-if="isSuperAdmin" />
           </template>
         </Toolbar>
         <DataTable
-          :value="filteredCompanies"
+          :value="filteredClassificacoes"
           :paginator="true"
           :rows="pagination.perPage"
           :totalRecords="pagination.total"
@@ -99,12 +99,13 @@ function deleteCompany(id: number) {
           class="p-datatable-sm"
         >
           <Column field="nome" header="Nome" sortable></Column>
+          <Column field="tipo" header="Tipo" sortable></Column>
           <Column field="descricao" header="Descrição" sortable></Column>
           <Column header="Ações" style="width: 12rem">
             <template #body="{ data }">
               <div class="flex gap-2">
-                <Button icon="pi pi-pencil" severity="info" text rounded aria-label="Edit" @click="editCompany(data.id)" />
-                <Button icon="pi pi-trash" severity="danger" text rounded aria-label="Delete" @click="deleteCompany(data.id)" v-if="isSuperAdmin" />
+                <Button icon="pi pi-pencil" severity="info" text rounded aria-label="Edit" @click="editClassificacao(data.id)" />
+                <Button icon="pi pi-trash" severity="danger" text rounded aria-label="Delete" @click="deleteClassificacao(data.id)" v-if="isSuperAdmin" />
               </div>
             </template>
           </Column>

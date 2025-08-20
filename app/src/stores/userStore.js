@@ -45,8 +45,7 @@ export const useUserStore = defineStore('users', () => {
             { label: 'Gerenciar Grupos de Acesso', icon: 'pi pi-fw pi-users', to: '/access-groups' },
             { label: 'Gerenciar Usuários', icon: 'pi pi-fw pi-users', to: '/users' },
             { label: 'Gerenciar Empresas', icon: 'pi pi-building', to: '/companies' },
-            { label: 'Classificação Federal', icon: 'pi pi-id-card', to: '/federal' },
-            { label: 'Classificação Estadual', icon: 'pi pi-id-card', to: '/estadual' },
+            { label: 'Classificação de Estruturas', icon: 'pi pi-id-card', to: '/classificacao' },
         ];
 
         const adminMenu = (isAdmin.value || isSuperAdmin.value) ? adminOnlyMenu : [];

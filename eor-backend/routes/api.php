@@ -5,6 +5,7 @@ use App\Http\Controllers\GrupoAcessoController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\ComentarioController;
 use App\Http\Controllers\ArquivoClassificacaoController;
+use App\Http\Controllers\ClassificacaoEstruturaController;
 use App\Http\Controllers\CompanyController;
 use App\Http\Middleware\ForceJsonResponse;
 use Illuminate\Support\Facades\Route;
@@ -38,12 +39,16 @@ Route::middleware(['auth:sanctum', ForceJsonResponse::class])->group(function ()
     Route::post('/companies', [CompanyController::class, 'store']);
     Route::get('/companies/{id}', [CompanyController::class, 'show']);
     Route::put('/companies/{id}', [CompanyController::class, 'update']);
+    
+    // Rotas para Classificacao Estrutura
+    Route::apiResource('classificacao-estrutura', ClassificacaoEstruturaController::class);
+    
     Route::delete('/companies/{id}', [CompanyController::class, 'destroy']);
     Route::get('/companies/{id}/users', [CompanyController::class, 'getUsers']);
     Route::post('/companies/{id}/users', [CompanyController::class, 'addUser']);
     Route::delete('/companies/{id}/users/{userId}', [CompanyController::class, 'removeUser']);
 
-    Route::get('/estruturas/{id}/auditoria', [App\Http\Controllers\EstruturaController::class, 'auditoria']);
+    Route::get('/estruturas/{id}/auditoria', [EstruturaController::class, 'auditoria']);
 });
 
 Route::prefix('auth')->middleware(ForceJsonResponse::class)->group(function () {

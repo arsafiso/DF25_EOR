@@ -28,7 +28,7 @@ const filters = computed(() => {
     const activeFilters = [];
 
     if (searchQuery.value) {
-        activeFilters.push({ field: 'finalidade', operator: 'contains', value: searchQuery.value });
+        activeFilters.push({ field: 'nome', operator: 'contains', value: searchQuery.value });
     }
 
     if (selectedStatus.value) {
@@ -48,8 +48,8 @@ const filters = computed(() => {
 
 const filteredStructuresLocal = computed(() => {
     return structureStore.structures.filter(structure => {
-        const finalidadeMatch = searchQuery.value
-            ? (structure.finalidade || '').toLowerCase().includes(searchQuery.value.toLowerCase())
+        const nomeMatch = searchQuery.value
+            ? (structure.nome || '').toLowerCase().includes(searchQuery.value.toLowerCase())
             : true;
         const statusMatch = selectedStatus.value
             ? structure.status === selectedStatus.value
@@ -60,7 +60,7 @@ const filteredStructuresLocal = computed(() => {
         const empresaMatch = selectedEmpresa.value
             ? structure.company_id === selectedEmpresa.value
             : true;
-        return finalidadeMatch && statusMatch && classificacaoMatch && empresaMatch;
+        return nomeMatch && statusMatch && classificacaoMatch && empresaMatch;
     });
 });
 
@@ -68,7 +68,7 @@ const filteredStructuresLocal = computed(() => {
 const empresasMap = ref({});
 const empresasOptions = ref([]);
 
-    async function fetchEmpresasMap() {
+async function fetchEmpresasMap() {
     try {
         const response = await axios.get('/companies');
         // Cria um map id -> nome
@@ -85,7 +85,6 @@ onMounted(() => {
     structureStore.fetchStructures();
     fetchEmpresasMap();
 });
-
 
 watch(isSuperAdmin, (val) => {
     if (val) fetchEmpresasMap();
@@ -213,7 +212,7 @@ const getStatusSeverity = (status) => {
                     tableStyle="min-width: 50rem"
                     class="p-datatable-sm"
                 >
-                    <Column field="finalidade" header="Finalidade" sortable></Column>
+                    <Column field="nome" header="Nome" sortable></Column>
                     <Column header="Status" sortable :sortField="'status'">
                         <template #body="{ data }">
                             <Tag :value="data.status" :severity="getStatusSeverity(data.status)" />

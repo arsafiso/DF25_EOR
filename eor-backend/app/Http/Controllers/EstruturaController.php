@@ -7,7 +7,8 @@ use App\Models\GrupoEstruturaAcesso;
 use Illuminate\Http\Request;
 use App\Http\Requests\EstruturaRequest;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Log;
+
+use App\Services\EstruturaHtmlService;
 
 class EstruturaController extends Controller
 {
@@ -21,7 +22,7 @@ class EstruturaController extends Controller
             $estruturas = Estrutura::where('company_id', $user->company_id)->get(); 
         }else {
             // Busca os IDs dos grupos do usuário
-            $gruposIds = $user->grupos()->pluck('grupos_acesso.id');
+            $gruposIds = $user->grupos->pluck('id');
             // Busca os IDs das estruturas acessíveis por esses grupos, exceto 'sem_nivel'
             $estruturasIds = GrupoEstruturaAcesso::whereIn('grupo_id', $gruposIds)
                 ->where('nivel_acesso', '!=', 'sem_nivel')
@@ -77,7 +78,7 @@ class EstruturaController extends Controller
             }
 
             if (!in_array($user->role, ['admin', 'superadmin'])) {
-                $gruposIds = $user->grupos()->pluck('grupos_acesso.id');
+                $gruposIds = $user->grupos->pluck('id');
                 $acessos = GrupoEstruturaAcesso::where('estrutura_id', $estrutura->id)
                     ->whereIn('grupo_id', $gruposIds)
                     ->get();
@@ -112,7 +113,7 @@ class EstruturaController extends Controller
             }
 
             if (!in_array($user->role, ['admin', 'superadmin'])) {
-                $gruposIds = $user->grupos()->pluck('grupos_acesso.id');
+                $gruposIds = $user->grupos->pluck('id');
                 $acesso = GrupoEstruturaAcesso::where('estrutura_id', $estrutura->id)
                     ->where('nivel_acesso', 'leitura_escrita')
                     ->whereIn('grupo_id', $gruposIds)
@@ -131,7 +132,42 @@ class EstruturaController extends Controller
                     'altura_maxima_estadual' => $request->input('altura_maxima_estadual'),
                 ]
             ));
-            return response()->json(['message' => 'Estrutura atualizada com sucesso!', 'data' => $estrutura], 200);
+            
+            $envio_email = true;// true desativa envio, false ativa envio de e-mail
+
+            if ($envio_email) {
+                    // Geração do HTML de alteração
+                    $audits = $estrutura->audits()->with('user')->orderBy('created_at', 'desc')->first();
+                    $alteracoes = [];
+                    if ($audits) {
+                        $fields = array_unique(array_merge(
+                            array_keys((array)$audits->old_values),
+                            array_keys((array)$audits->new_values)
+                        ));
+                        $fields = array_filter($fields, fn($f) => $f !== 'updated_by');
+                        foreach ($fields as $field) {
+                            $alteracoes[] = [
+                                'campo' => $field,
+                                'valor_anterior' => $audits->old_values[$field] ?? '',
+                                'novo_valor' => $audits->new_values[$field] ?? '',
+                            ];
+                        }
+                    }
+                    $dadosHtml = [
+                        'nome_estrutura' => $estrutura->finalidade ?? $estrutura->id,
+                        'usuario' => Auth::user()->name ?? 'Desconhecido',
+                        'data_hora' => now('America/Sao_Paulo')->format('d/m/Y') . ' às ' . now('America/Sao_Paulo')->format('H:i'),
+                        'alteracoes' => $alteracoes,
+                        'justificativa' => $audits->justificativa ?? ($request->input('justificativa') ?? ''),
+                    ];
+                    $html = \App\Services\EstruturaHtmlService::gerarHtmlAlteracaoEstrutura($dadosHtml);
+                    //para teste local:
+                    //$caminho = 'C:/OneDrive - BRIDGE/Área de Trabalho/alteracao_estrutura_' . $estrutura->id . '_' . time() . '.html';
+                    //file_put_contents($caminho, $html);
+                $response = response()->json(['message' => 'Estrutura atualizada com sucesso!', 'data' => $estrutura], 200);
+                \App\Jobs\SendEstruturaMailJob::dispatch($estrutura, $html, 'Alteração na Estrutura: ' . ($estrutura->finalidade ?? $estrutura->id));
+                return $response;
+            }
         } catch (\Exception $e) {
             return response()->json(['message' => 'Erro ao atualizar estrutura.', 'error' => $e->getMessage()], 500);
         }

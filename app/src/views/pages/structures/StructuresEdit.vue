@@ -23,6 +23,7 @@ const canEdit = ref(false);
 
 const structure = ref({
     // Basic Information
+    nome: '',
     finalidade: '',
     projetistas: '',
     status: '',
@@ -141,7 +142,7 @@ onMounted(async () => {
 });
 
 const fieldTabs = {
-    0: ['finalidade', 'projetistas', 'status', 'classificacao_federal', 'classificacao_estadual', 'classificacao_cda'],
+    0: ['nome', 'finalidade', 'projetistas', 'status', 'classificacao_federal', 'classificacao_estadual', 'classificacao_cda'],
     1: ['elevacao_crista', 'altura_maxima_federal', 'altura_maxima_estadual', 'largura_coroamento', 'area_reservatorio_crista', 'area_reservatorio_soleira', 'elevacao_base', 'altura_maxima_entre_bermas', 'largura_bermas'],
     2: ['tipo_secao', 'drenagem_interna', 'instrumentacao', 'fundacao', 'analises_estabilidade'],
     3: ['area_bacia_contribuicao', 'area_espelho_dagua', 'na_maximo_operacional', 'na_maximo_maximorum', 'borda_livre', 'volume_transito_cheias', 'sistema_extravasor']
@@ -220,7 +221,7 @@ const saveStructure = async () => {
             }
         } else {
             // Superadmin usa empresa selecionada
-            let payload = { ...structure.value };
+            let payload = { ...structure.value, justificativa: justificativa.value };
             if (isSuperAdmin.value && route.query.empresaId) {
                 payload.empresa_id = Number(route.query.empresaId);
                 payload.company_id = Number(route.query.empresaId);
@@ -442,6 +443,7 @@ const auditFieldOptions = computed(() => {
 
 // Mapeamento dos nomes dos campos para exibição amigável
 const auditFieldLabels = {
+    nome: 'Nome',
     finalidade: 'Finalidade',
     projetistas: 'Projetistas',
     status: 'Status',
@@ -519,16 +521,24 @@ function formatDateTime(dateStr) {
                         <TabPanels>
                             <TabPanel :value="0">
                                 <div class="grid gap-4">
-                                    <div class="col-span-12 md:col-span-6 mb-4">
-                                        <label for="finalidade" class="block mb-2">Finalidade</label>
-                                        <InputText fluid id="finalidade" v-model="structure.finalidade" :class="{ 'p-invalid': validationErrors.finalidade }" />
-                                        <small v-if="validationErrors.finalidade" class="p-error">{{ validationErrors.finalidade }}</small>
+                                    <div class="col-span-12 mb-4">
+                                        <label for="nome" class="block mb-2">Nome <span style="color: red;">*</span></label>
+                                        <InputText fluid id="nome" v-model="structure.nome" :class="{ 'p-invalid': validationErrors.nome }" placeholder="Digite o nome da estrutura" />
+                                        <small v-if="validationErrors.nome" class="p-error">{{ validationErrors.nome }}</small>
                                     </div>
-
-                                    <div class="col-span-12 md:col-span-6 mb-4">
-                                        <label for="status" class="block mb-2">Status</label>
-                                        <Select fluid id="status" v-model="structure.status" :options="statusOptions" optionLabel="label" optionValue="value" placeholder="Selecione o status" :class="{ 'p-invalid': validationErrors.status }" />
-                                        <small v-if="validationErrors.status" class="p-error">{{ validationErrors.status }}</small>
+                                    <div class="col-span-12 md:col-span-12 mb-4">
+                                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            <div>
+                                                <label for="finalidade" class="block mb-2">Finalidade</label>
+                                                <InputText fluid id="finalidade" v-model="structure.finalidade" :class="{ 'p-invalid': validationErrors.finalidade }" />
+                                                <small v-if="validationErrors.finalidade" class="p-error">{{ validationErrors.finalidade }}</small>
+                                            </div>
+                                            <div>
+                                                <label for="status" class="block mb-2">Status</label>
+                                                <Select fluid id="status" v-model="structure.status" :options="statusOptions" optionLabel="label" optionValue="value" placeholder="Selecione o status" :class="{ 'p-invalid': validationErrors.status }" />
+                                                <small v-if="validationErrors.status" class="p-error">{{ validationErrors.status }}</small>
+                                            </div>
+                                        </div>
                                     </div>
 
                                     <div class="col-span-12 mb-4">

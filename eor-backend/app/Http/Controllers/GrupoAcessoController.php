@@ -15,18 +15,25 @@ class GrupoAcessoController extends Controller
      */
     public function index()
     {
-        $user = auth()->user();
+        try {
+            $user = Auth::user();
 
-        if ($user->role === 'superadmin') {
-            $grupos = GrupoAcesso::all();
-        } else {
-            $grupos = GrupoAcesso::where('company_id', $user->company_id)->get();
+            if ($user->role === 'superadmin') {
+                $grupos = GrupoAcesso::all();
+            } else {
+                $grupos = GrupoAcesso::where('company_id', $user->company_id)->get();
+            }
+
+            return response()->json([
+                'message' => 'Grupos de acesso listados com sucesso!',
+                'data' => $grupos,
+            ], 200);
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'Erro ao listar grupos de acesso.',
+                'error' => $e->getMessage(),
+            ], 500);
         }
-
-        return response()->json([
-            'message' => 'Grupos de acesso listados com sucesso!',
-            'data' => $grupos,
-        ], 200);
     }
 
     /**
@@ -64,6 +71,16 @@ class GrupoAcessoController extends Controller
             // Verifica se há estruturas para associar
             if (!empty($validated['estruturas'])) {
                 foreach ($validated['estruturas'] as $estrutura) {
+                    // Busca estrutura no banco para validação do company_id
+                    $estruturaModel = \App\Models\Estrutura::find($estrutura['estrutura_id']);
+                    if (!$estruturaModel) {
+                        return response()->json(['error' => 'Estrutura não encontrada.'], 422);
+                    }
+                    if ($estrutura['nivel_acesso'] !== 'sem_nivel' && $estruturaModel->company_id != $grupo->company_id) {
+                        return response()->json([
+                            'error' => 'Estrutura (' . $estruturaModel->id . ') não pertence à mesma empresa do grupo de acesso.'
+                        ], 422);
+                    }
                     GrupoEstruturaAcesso::create([
                         'grupo_id' => $grupo->id,
                         'estrutura_id' => $estrutura['estrutura_id'],
@@ -107,12 +124,14 @@ class GrupoAcessoController extends Controller
                 'descricao' => $grupo->descricao,
                 'created_at' => $grupo->created_at,
                 'updated_at' => $grupo->updated_at,
+                'company_id' => $grupo->company_id,
                 'estruturas' => $grupo->estruturas->map(function ($estrutura) {
                     return [
                         'id' => $estrutura->id,
-                        'finalidade' => $estrutura->estrutura->finalidade,
+                        'nome' => $estrutura->estrutura->nome,
                         'grupo_id' => $estrutura->grupo_id,
                         'estrutura_id' => $estrutura->estrutura_id,
+                        'company_id' => $estrutura->estrutura->company_id,
                         'nivel_acesso' => $estrutura->nivel_acesso,
                         'created_at' => $estrutura->created_at,
                         'updated_at' => $estrutura->updated_at,
@@ -161,6 +180,16 @@ class GrupoAcessoController extends Controller
 
                 // Cria as novas associações
                 foreach ($validated['estruturas'] as $estrutura) {
+                    // Busca estrutura no banco para validação do company_id
+                    $estruturaModel = \App\Models\Estrutura::find($estrutura['estrutura_id']);
+                    if (!$estruturaModel) {
+                        return response()->json(['error' => 'Estrutura não encontrada.'], 422);
+                    }
+                    if ($estrutura['nivel_acesso'] !== 'sem_nivel' && $estruturaModel->company_id != $grupo->company_id) {
+                        return response()->json([
+                            'error' => 'Estrutura (' . $estruturaModel->id . ') não pertence à mesma empresa do grupo de acesso.'
+                        ], 422);
+                    }
                     GrupoEstruturaAcesso::create([
                         'grupo_id' => $grupo->id,
                         'estrutura_id' => $estrutura['estrutura_id'],
@@ -222,12 +251,14 @@ class GrupoAcessoController extends Controller
         ]);
 
         try {
-            // Busca o grupo de acesso
             $grupo = GrupoAcesso::findOrFail($grupoId);
-
-            // Adiciona o usuário ao grupo
+            $usuario = \App\Models\User::find($validated['usuario_id']);
+            if (!$usuario || $usuario->company_id != $grupo->company_id) {
+                return response()->json([
+                    'error' => 'Usuário não pertence à empresa do grupo.'
+                ], 422);
+            }
             $grupo->usuarios()->attach($validated['usuario_id']);
-
             return response()->json([
                 'message' => 'Usuário adicionado ao grupo com sucesso!',
             ], 200);
@@ -268,10 +299,11 @@ class GrupoAcessoController extends Controller
         try {
             // Busca o grupo de acesso
             $grupo = GrupoAcesso::findOrFail($grupoId);
-
-            // Remove o usuário do grupo
+            $usuario = \App\Models\User::find($validated['usuario_id']);
+            if (!$usuario || $usuario->company_id != $grupo->company_id) {
+                return response()->json(['error' => 'Usuário não pertence à empresa do grupo.'], 422);
+            }
             $grupo->usuarios()->detach($validated['usuario_id']);
-
             return response()->json([
                 'message' => 'Usuário removido do grupo com sucesso!',
             ], 200);

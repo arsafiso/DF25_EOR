@@ -12,7 +12,7 @@ class CompanyController extends Controller
     // Listar todas as empresas
     public function index()
     {
-        $user = auth()->user();
+        $user = Auth::user();
 
         if ($user->role === 'superadmin') {
             $empresas = Company::all();

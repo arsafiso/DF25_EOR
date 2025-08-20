@@ -168,28 +168,28 @@ export const useStructureStore = defineStore('structures', () => {
 
     const federalClassificationOptions = ref([]);
     async function fetchFederalClassifications() {
-    try {
-        const response = await axios.get('/companies'); // pega todas as empresas
-        federalClassificationOptions.value = response.data.map(item => ({
-            label: item.nome,  // o que vai aparecer no Select
-            value: item.id  
-        }));
-    } catch (e) {
-        console.error('Erro ao carregar as opções:', e);
-    }
+        try {
+            const response = await axios.get('/classificacao-estrutura'); // pega todas as empresas
+            federalClassificationOptions.value = response.data.map(item => ({
+                label: item.nome,  // o que vai aparecer no Select
+                value: item.id  
+            }));
+        } catch (e) {
+            console.error('Erro ao carregar as opções:', e);
+        }
     }
 
     const stateClassificationOptions = ref([]);
     async function fetchStateClassificationOptions() {
-    try {
-        const response = await axios.get('/companies'); // pega todas as empresas
-        stateClassificationOptions.value = response.data.map(item => ({
-            label: item.nome,  // o que vai aparecer no Select
-            value: item.id  
-        }));
-    } catch (e) {
-        console.error('Erro ao carregar as opções:', e);
-    }
+        try {
+            const response = await axios.get('/classificacao-estrutura'); // pega todas as empresas
+            stateClassificationOptions.value = response.data.map(item => ({
+                label: item.nome,  // o que vai aparecer no Select
+                value: item.id  
+            }));
+        } catch (e) {
+            console.error('Erro ao carregar as opções:', e);
+        }
     }
 
     const cdaClassificationOptions = [

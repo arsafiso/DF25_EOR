@@ -13,11 +13,8 @@ import StructuresList from '@/views/pages/structures/StructuresList.vue';
 import CompaniesEdit from '@/views/pages/companies/CompaniesEdit.vue';
 import CompaniesList from '@/views/pages/companies/CompaniesList.vue';
 
-import FederalEdit from '@/views/pages/federal/FederalEdit.vue';
-import FederalList from '@/views/pages/federal/FederalList.vue';
-
-import EstadualEdit from '@/views/pages/estadual/EstadualEdit.vue';
-import EstadualList from '@/views/pages/estadual/EstadualList.vue';
+import ClassificacaoEdit from '@/views/pages/classificacao/ClassificacaoEdit.vue';
+import ClassificacaoList from '@/views/pages/classificacao/ClassificacaoList.vue';
 
 const guards = (to, from, next) => {
     const hasToken = localStorage.getItem('eor__token');
@@ -105,35 +102,19 @@ const router = createRouter({
                 },
 
                 {
-                    path: '/federal',
-                    name: 'Federal',
-                    component: FederalList
+                    path: '/classificacao',
+                    name: 'Classificacao',
+                    component: ClassificacaoList
                 },
                 {
-                    path: '/federal/new',
-                    name: 'Newfederal',
-                    component: FederalEdit
+                    path: '/classificacao/new',
+                    name: 'NewClassificacao',
+                    component: ClassificacaoEdit
                 },
                 {
-                    path: '/federal/:id',
-                    name: 'EditFederal',
-                    component: FederalEdit
-                },
-
-                {
-                    path: '/estadual',
-                    name: 'Estadual',
-                    component: EstadualList
-                },
-                {
-                    path: '/estadual/new',
-                    name: 'NewEstadual',
-                    component: EstadualEdit
-                },
-                {
-                    path: '/estadual/:id',
-                    name: 'EditEstadual',
-                    component: EstadualEdit
+                    path: '/classificacao/:id',
+                    name: 'EditClassificacao',
+                    component: ClassificacaoEdit
                 }
             ]
         },

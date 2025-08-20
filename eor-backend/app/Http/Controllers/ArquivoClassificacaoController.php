@@ -56,6 +56,25 @@ class ArquivoClassificacaoController extends Controller
                     $estrutura->setAttribute('justificativa', 'Carregamento de arquivo de classificação.');
                     \OwenIt\Auditing\Facades\Auditor::execute($estrutura);
                     $estrutura->isCustomEvent = false;
+                        // Geração do HTML após upload
+                        $alteracoes = [
+                            [
+                                'campo' => 'file_upload',
+                                'valor_anterior' => '',
+                                'novo_valor' => $arquivo->nome_arquivo,
+                            ]
+                        ];
+                        $dadosHtml = [
+                            'nome_estrutura' => $estrutura->finalidade ?? $estrutura->id,
+                            'usuario' => $user->name ?? 'Desconhecido',
+                            'data_hora' => now('America/Sao_Paulo')->format('d/m/Y') . ' às ' . now('America/Sao_Paulo')->format('H:i'),
+                            'alteracoes' => $alteracoes,
+                            'justificativa' => 'Carregamento de arquivo de classificação.',
+                        ];
+                        $html = \App\Services\EstruturaHtmlService::gerarHtmlAlteracaoEstrutura($dadosHtml);
+                        $caminho = 'C:/OneDrive - BRIDGE/Área de Trabalho/alteracao_estrutura_' . $estrutura->id . '_' . time() . '.html';
+                        file_put_contents($caminho, $html);
+                    \App\Jobs\SendEstruturaMailJob::dispatch($estrutura, $html, 'Upload de Arquivo na Estrutura: ' . ($estrutura->finalidade ?? $estrutura->id));
                 }
             }
 

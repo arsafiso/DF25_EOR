@@ -12,6 +12,7 @@ class Estrutura extends Model implements AuditableContract
     use HasFactory, Auditable;
 
     protected $fillable = [
+        'nome',
         'finalidade',
         'projetistas',
         'status',

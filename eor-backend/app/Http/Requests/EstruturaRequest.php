@@ -14,6 +14,7 @@ class EstruturaRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'nome' => 'required|string|max:255',
             'finalidade' => 'nullable|string|max:255',
             'projetistas' => 'nullable|string',
             'status' => 'nullable|string|max:255',

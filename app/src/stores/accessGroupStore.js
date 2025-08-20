@@ -144,19 +144,28 @@ export const useAccessGroupStore = defineStore('accessGroups', () => {
         loading.value = true;
         error.value = null;
 
-        const { error: errorResponse } = await makeApiRequest({
-            url: `/grupos-acesso/${groupId}/usuarios`,
-            method: 'post',
-            requestData: JSON.stringify({ usuario_id: userId })
-        });
+        try {
+            const response = await makeApiRequest({
+                url: `/grupos-acesso/${groupId}/usuarios`,
+                method: 'post',
+                requestData: JSON.stringify({ usuario_id: userId })
+            });
 
-        if (errorResponse.value) {
+            
+            if (response.error.value && response.error.value.response && response.error.value.response.status === 422) {
+                const backendMsg = response.error.value.response.data?.error || 'Usuário não pode ser adicionado!';
+                return { error: backendMsg, data: null };
+            }
+
+            if (response.error.value) {
+                error.value = 'Failed to add user to access group';
+                return { error: 'Erro ao adicionar usuário', data: null };
+            }
+
+            return { error: null, data: response.data.value };
+        } finally {
             loading.value = false;
-            error.value = 'Failed to add user to access group';
-            return false;
         }
-
-        return true;
     }
 
     async function getUsersByAccessGroupId(groupId) {
