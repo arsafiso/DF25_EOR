@@ -1,7 +1,8 @@
 import { defineStore } from 'pinia';
-import { computed, ref } from 'vue';
-
+import { computed, ref, onMounted } from 'vue';
 import { makeApiRequest } from '@/libs/helpers';
+import axios from '@/libs/axios';
+
 // vamos criar um file para salvar os fake responses de cada request da estrutura
 
 export const useStructureStore = defineStore('structures', () => {
@@ -165,9 +166,31 @@ export const useStructureStore = defineStore('structures', () => {
         { label: 'Planejada', value: 'Planejada' }
     ];
 
-    const federalClassificationOptions = [{ label: 'Valor 1', value: 'Valor 1' }];
+    const federalClassificationOptions = ref([]);
+    async function fetchFederalClassifications() {
+    try {
+        const response = await axios.get('/companies'); // pega todas as empresas
+        federalClassificationOptions.value = response.data.map(item => ({
+            label: item.nome,  // o que vai aparecer no Select
+            value: item.id  
+        }));
+    } catch (e) {
+        console.error('Erro ao carregar as opções:', e);
+    }
+    }
 
-    const stateClassificationOptions = [{ label: 'Tipo 1', value: 'Tipo 1' }];
+    const stateClassificationOptions = ref([]);
+    async function fetchStateClassificationOptions() {
+    try {
+        const response = await axios.get('/companies'); // pega todas as empresas
+        stateClassificationOptions.value = response.data.map(item => ({
+            label: item.nome,  // o que vai aparecer no Select
+            value: item.id  
+        }));
+    } catch (e) {
+        console.error('Erro ao carregar as opções:', e);
+    }
+    }
 
     const cdaClassificationOptions = [
         { label: 'Alta', value: 'high' },
@@ -193,11 +216,13 @@ export const useStructureStore = defineStore('structures', () => {
         addFilter,
         removeFilter,
         clearFilters,
+        fetchFederalClassifications,
+        fetchStateClassificationOptions,
 
         // options
         statusOptions,
         federalClassificationOptions,
         stateClassificationOptions,
-        cdaClassificationOptions
+        cdaClassificationOptions,
     };
 });

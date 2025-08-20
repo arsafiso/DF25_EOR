@@ -68,7 +68,7 @@ const filteredStructuresLocal = computed(() => {
 const empresasMap = ref({});
 const empresasOptions = ref([]);
 
-async function fetchEmpresasMap() {
+    async function fetchEmpresasMap() {
     try {
         const response = await axios.get('/companies');
         // Cria um map id -> nome
@@ -85,6 +85,7 @@ onMounted(() => {
     structureStore.fetchStructures();
     fetchEmpresasMap();
 });
+
 
 watch(isSuperAdmin, (val) => {
     if (val) fetchEmpresasMap();

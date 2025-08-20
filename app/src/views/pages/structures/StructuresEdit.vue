@@ -112,6 +112,11 @@ onMounted(async () => {
         }
     }
 
+    // Carregar opções de classificação
+    await structureStore.fetchFederalClassifications();
+    await structureStore.fetchStateClassificationOptions();
+    
+
     //console.log('entrou 1');//para debug
     // Buscar comentários da estrutura
     try {
@@ -542,7 +547,7 @@ function formatDateTime(dateStr) {
                                             fluid
                                             id="classificacao_federal"
                                             v-model="structure.classificacao_federal"
-                                            :options="federalClassificationOptions"
+                                            :options="structureStore.federalClassificationOptions"
                                             optionLabel="label"
                                             optionValue="value"
                                             placeholder="Selecione a classificação"
@@ -557,7 +562,7 @@ function formatDateTime(dateStr) {
                                             fluid
                                             id="classificacao_estadual"
                                             v-model="structure.classificacao_estadual"
-                                            :options="stateClassificationOptions"
+                                            :options="structureStore.stateClassificationOptions"
                                             optionLabel="label"
                                             optionValue="value"
                                             placeholder="Selecione a classificação"
