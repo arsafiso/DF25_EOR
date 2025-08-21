@@ -169,8 +169,10 @@ export const useStructureStore = defineStore('structures', () => {
     const federalClassificationOptions = ref([]);
     async function fetchFederalClassifications() {
         try {
-            const response = await axios.get('/classificacao-estrutura'); // pega todas as empresas
-            federalClassificationOptions.value = response.data.map(item => ({
+            const response = await axios.get('/classificacao-estrutura'); // pega todas as classificações
+            federalClassificationOptions.value = response.data
+            .filter(item => item.tipo === 'federal') // filtra apenas as classificações federais
+            .map(item => ({
                 label: item.nome,  // o que vai aparecer no Select
                 value: item.id  
             }));
@@ -182,15 +184,17 @@ export const useStructureStore = defineStore('structures', () => {
     const stateClassificationOptions = ref([]);
     async function fetchStateClassificationOptions() {
         try {
-            const response = await axios.get('/classificacao-estrutura'); // pega todas as empresas
-            stateClassificationOptions.value = response.data.map(item => ({
+            const response = await axios.get('/classificacao-estrutura'); // pega todas as classificações
+            stateClassificationOptions.value = response.data
+            .filter(item => item.tipo === 'estadual') // filtra apenas as classificações estaduais
+            .map(item => ({
                 label: item.nome,  // o que vai aparecer no Select
                 value: item.id  
             }));
         } catch (e) {
             console.error('Erro ao carregar as opções:', e);
         }
-    }
+        }
 
     const cdaClassificationOptions = [
         { label: 'Alta', value: 'high' },

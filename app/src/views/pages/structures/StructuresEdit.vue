@@ -95,12 +95,37 @@ onMounted(async () => {
         structure.value.empresa_id = Number(route.query.empresaId);
     }
 
+    // Carregar opções de classificação
+    await structureStore.fetchFederalClassifications();
+    await structureStore.fetchStateClassificationOptions();
+
     if (isEditing.value) {
         const { data, error } = await structureStore.getStructureById(structureId.value);
 
         if (data) {
             structure.value = { ...data };
             canEdit.value = data.pode_editar;
+            
+             // adapta os valores para o formato { label, value }
+        if (data.classificacao_federal) {
+            structure.value.classificacao_federal = {
+                value: data.classificacao_federal,
+                label: structureStore.federalClassifications.find(
+                    opt => opt.value === data.classificacao_federal
+                )?.label || ''
+            };
+        }
+
+        if (data.classificacao_estadual) {
+            structure.value.classificacao_estadual = {
+                value: data.classificacao_estadual,
+                label: structureStore.stateClassifications.find(
+                    opt => opt.value === data.classificacao_estadual
+                )?.label || ''
+            };
+        }
+
+        canEdit.value = data.pode_editar;
         } else {
             toast.add({
                 severity: 'error',
@@ -113,9 +138,7 @@ onMounted(async () => {
         }
     }
 
-    // Carregar opções de classificação
-    await structureStore.fetchFederalClassifications();
-    await structureStore.fetchStateClassificationOptions();
+    
     
 
     //console.log('entrou 1');//para debug
@@ -221,7 +244,12 @@ const saveStructure = async () => {
             }
         } else {
             // Superadmin usa empresa selecionada
-            let payload = { ...structure.value, justificativa: justificativa.value };
+            let payload = { 
+                ...structure.value, 
+                justificativa: justificativa.value,
+                 classificacao_federal: structure.value.classificacao_federal?.value || null,
+                classificacao_estadual: structure.value.classificacao_estadual?.value || null
+            };
             if (isSuperAdmin.value && route.query.empresaId) {
                 payload.empresa_id = Number(route.query.empresaId);
                 payload.company_id = Number(route.query.empresaId);
