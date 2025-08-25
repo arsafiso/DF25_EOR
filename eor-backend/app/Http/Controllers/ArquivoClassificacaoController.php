@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Http\Request;
 use App\Models\ArquivoClassificacao;
+use App\Models\Estrutura;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Auth;
 
@@ -25,9 +26,24 @@ class ArquivoClassificacaoController extends Controller
     {
         try {
             $user = Auth::user();
+            $estrutura = \App\Models\Estrutura::findOrFail($estruturaId);
 
-            // Verifica se é admin ou tem permissão de edição
-            if (!$user || (!in_array($user->role, ['admin', 'superadmin']) && !$user->canEdit)) {
+            $temPermissao = false;
+            if ($user) {
+                if ($user->role === 'superadmin' || ($user->role === 'admin' && $user->company_id === $estrutura->company_id)) {
+                    $temPermissao = true;
+                } else {
+                    $gruposIds = $user->grupos ? $user->grupos->pluck('id') : [];
+                    $acesso = \App\Models\GrupoEstruturaAcesso::where('estrutura_id', $estruturaId)
+                        ->where('nivel_acesso', 'leitura_escrita')
+                        ->whereIn('grupo_id', $gruposIds)
+                        ->exists();
+                    if ($acesso) {
+                        $temPermissao = true;
+                    }
+                }
+            }
+            if (!$temPermissao) {
                 return response()->json(['error' => 'Sem permissão para enviar arquivos.'], 403);
             }
 

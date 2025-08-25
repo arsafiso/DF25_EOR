@@ -7,7 +7,6 @@ use App\Models\GrupoEstruturaAcesso;
 use Illuminate\Http\Request;
 use App\Http\Requests\EstruturaRequest;
 use Illuminate\Support\Facades\Auth;
-
 use App\Services\EstruturaHtmlService;
 
 class EstruturaController extends Controller
@@ -19,8 +18,17 @@ class EstruturaController extends Controller
         if ($user->role == 'superadmin') {
             $estruturas = Estrutura::all();
         } else if ($user->role == 'admin') {
-            $estruturas = Estrutura::where('company_id', $user->company_id)->get(); 
-        }else {
+            
+            $estruturasEmpresa = Estrutura::where('company_id', $user->company_id)->get();
+
+            $gruposEspecialIds = $user->grupos->where('tipo', 'especial')->pluck('id');
+            $estruturasEspecialIds = GrupoEstruturaAcesso::whereIn('grupo_id', $gruposEspecialIds)
+                ->where('nivel_acesso', '!=', 'sem_nivel')
+                ->pluck('estrutura_id');
+            $estruturasEspecial = Estrutura::whereIn('id', $estruturasEspecialIds)->get();
+
+            $estruturas = $estruturasEmpresa->merge($estruturasEspecial)->unique('id')->values();
+        } else {
             // Busca os IDs dos grupos do usuário
             $gruposIds = $user->grupos->pluck('id');
             // Busca os IDs das estruturas acessíveis por esses grupos, exceto 'sem_nivel'
@@ -31,9 +39,18 @@ class EstruturaController extends Controller
             $estruturas = Estrutura::whereIn('id', $estruturasIds)->get();
         }
 
+        $estruturas->load(['classificacaoFederal', 'classificacaoEstadual']);
+
+        $estruturasArray = $estruturas->map(function ($estrutura) {
+            $arr = $estrutura->toArray();
+            $arr['classificacao_federal'] = $estrutura->classificacaoFederal ? $estrutura->classificacaoFederal->nome : null;
+            $arr['classificacao_estadual'] = $estrutura->classificacaoEstadual ? $estrutura->classificacaoEstadual->nome : null;
+            return $arr;
+        });
+
         return response()->json([
             'message' => 'Estruturas listadas com sucesso!',
-            'data' => $estruturas,
+            'data' => $estruturasArray,
         ], 200);
     }
 
@@ -46,7 +63,7 @@ class EstruturaController extends Controller
                 return response()->json(['message' => 'Você não tem permissão para criar estruturas.'], 403);
             }
 
-            if (!$user->company_id) {
+            if (!$user->company_id && !$request->input('company_id')) {
                 return response()->json(['error' => 'Usuário não associado a uma empresa.'], 200);
             }
 
@@ -73,7 +90,11 @@ class EstruturaController extends Controller
         try {
             $user = Auth::user();
 
-            if ($user->role != 'superadmin' && $user->company_id !== $estrutura->company_id) {
+            $temGrupoEspecial = $user->grupos && $user->grupos->contains(function ($g) {
+                return $g->tipo === 'especial';
+            });
+
+            if ($user->role != 'superadmin' && !$temGrupoEspecial && $user->company_id !== $estrutura->company_id) {
                 return response()->json(['message' => 'Você não tem permissão para visualizar esta estrutura.'], 403);
             }
 
@@ -108,11 +129,15 @@ class EstruturaController extends Controller
     {
         try {
             $user = Auth::user();
-            if ($user->role != 'superadmin' && $user->company_id !== $estrutura->company_id) {
+            $temGrupoEspecial = $user->grupos && $user->grupos->contains(function ($g) {
+                return $g->tipo === 'especial';
+            });
+
+            if ($user->role != 'superadmin' && !$temGrupoEspecial && $user->company_id !== $estrutura->company_id) {
                 return response()->json(['message' => 'Você não tem permissão para editar esta estrutura.'], 403);
             }
 
-            if (!in_array($user->role, ['admin', 'superadmin'])) {
+            if (!(($user->role === 'admin' && $user->company_id === $estrutura->company_id) || $user->role === 'superadmin')) {
                 $gruposIds = $user->grupos->pluck('id');
                 $acesso = GrupoEstruturaAcesso::where('estrutura_id', $estrutura->id)
                     ->where('nivel_acesso', 'leitura_escrita')
@@ -160,7 +185,7 @@ class EstruturaController extends Controller
                         'alteracoes' => $alteracoes,
                         'justificativa' => $audits->justificativa ?? ($request->input('justificativa') ?? ''),
                     ];
-                    $html = \App\Services\EstruturaHtmlService::gerarHtmlAlteracaoEstrutura($dadosHtml);
+                    $html = EstruturaHtmlService::gerarHtmlAlteracaoEstrutura($dadosHtml);
                     //para teste local:
                     //$caminho = 'C:/OneDrive - BRIDGE/Área de Trabalho/alteracao_estrutura_' . $estrutura->id . '_' . time() . '.html';
                     //file_put_contents($caminho, $html);
@@ -177,20 +202,9 @@ class EstruturaController extends Controller
     {
         try {
             $user = Auth::user();
-            if ($user->role != 'superadmin' && $user->company_id !== $estrutura->company_id) {
+
+            if (!($user->role == 'superadmin' || ($user->role == 'admin' && $user->company_id == $estrutura->company_id))) {
                 return response()->json(['message' => 'Você não tem permissão para excluir esta estrutura.'], 403);
-            }
-
-            if (!in_array($user->role, ['admin', 'superadmin'])) {
-                /* $gruposIds = $user->grupos()->pluck('grupos_acesso.id');
-                $acesso = GrupoEstruturaAcesso::where('estrutura_id', $estrutura->id)
-                    ->where('nivel_acesso', 'leitura_escrita')
-                    ->whereIn('grupo_id', $gruposIds)
-                    ->exists();
-
-                if (!$acesso) { */
-                    return response()->json(['message' => 'Você não tem permissão para excluir esta estrutura.'], 403);
-                //}
             }
 
             $estrutura->delete();
@@ -218,10 +232,29 @@ class EstruturaController extends Controller
                 $fields = array_filter($fields, fn($f) => $f !== 'updated_by');
                 $changes = collect($fields)
                     ->mapWithKeys(function ($field) use ($audit) {
+                        $old = $audit->old_values[$field] ?? null;
+                        $new = $audit->new_values[$field] ?? null;
+                        // Se for classificacao, buscar nome
+                        if ($field === 'classificacao_federal' && $old) {
+                            $oldObj = \App\Models\ClassificacaoEstrutura::find($old);
+                            $old = $oldObj ? $oldObj->nome : $old;
+                        }
+                        if ($field === 'classificacao_federal' && $new) {
+                            $newObj = \App\Models\ClassificacaoEstrutura::find($new);
+                            $new = $newObj ? $newObj->nome : $new;
+                        }
+                        if ($field === 'classificacao_estadual' && $old) {
+                            $oldObj = \App\Models\ClassificacaoEstrutura::find($old);
+                            $old = $oldObj ? $oldObj->nome : $old;
+                        }
+                        if ($field === 'classificacao_estadual' && $new) {
+                            $newObj = \App\Models\ClassificacaoEstrutura::find($new);
+                            $new = $newObj ? $newObj->nome : $new;
+                        }
                         return [
                             $field => [
-                                'old' => $audit->old_values[$field] ?? null,
-                                'new' => $audit->new_values[$field] ?? null,
+                                'old' => $old,
+                                'new' => $new,
                             ]
                         ];
                     });

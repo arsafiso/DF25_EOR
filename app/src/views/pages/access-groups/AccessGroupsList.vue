@@ -44,23 +44,16 @@ function confirmarEmpresa() {
     }
 }
 
-const filters = computed(() => {
-    const activeFilters = [];
-
-    if (searchQuery.value) {
-        activeFilters.push({ field: 'name', operator: 'contains', value: searchQuery.value });
-    }
-
-    return activeFilters;
-});
-
 onMounted(async () => {
     await accessGroupStore.fetchAccessGroups();
 });
 
-watch(searchQuery, () => {
-    accessGroupStore.clearFilters();
-    filters.value.forEach((filter) => accessGroupStore.addFilter(filter));
+const filteredAccessGroupsLocal = computed(() => {
+    if (!searchQuery.value) return accessGroupStore.accessGroups;
+    return accessGroupStore.accessGroups.filter(group => {
+        const nome = group.nome || group.name || '';
+        return nome.toLowerCase().includes(searchQuery.value.toLowerCase());
+    });
 });
 
 const createAccessGroup = () => {
@@ -73,6 +66,10 @@ const createAccessGroup = () => {
 
 const editAccessGroup = (id) => {
     router.push(`/access-groups/${id}`);
+};
+
+const createSpecialAccessGroup = () => {
+    router.push('/access-groups/new?special=1');
 };
 
 // Excluir um grupo de acesso
@@ -129,6 +126,7 @@ const formatPermissions = (structures) => {
                     </template>
                     <template #end>
                         <Button label="Adicionar Grupo de Acesso" icon="pi pi-plus" severity="success" @click="createAccessGroup" />
+                        <Button label="Adicionar Grupo de Acesso Especial" icon="pi pi-plus" :style="{ background: '#FF8C00', borderColor: '#FF8C00', color: '#fff' }" v-if="isSuperAdmin" @click="createSpecialAccessGroup" class="ml-2" />
                     </template>
                 </Toolbar>
                 <!-- Modal: seleção de empresa (superadmin) -->
@@ -144,21 +142,37 @@ const formatPermissions = (structures) => {
                 </Dialog>
 
                 <DataTable
-                    :value="accessGroupStore.paginatedAccessGroups"
-                    :paginator="true"
-                    :rows="accessGroupStore.pagination.perPage"
-                    :totalRecords="accessGroupStore.pagination.total"
-                    :loading="accessGroupStore.loading"
-                    paginatorTemplate="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink RowsPerPageDropdown"
-                    :rowsPerPageOptions="[5, 10, 25, 50]"
-                    @page="(e) => accessGroupStore.setPage(e.page + 1)"
-                    @rows="(e) => accessGroupStore.setPerPage(e)"
+                        :value="filteredAccessGroupsLocal"
+                        :paginator="true"
+                        :rows="accessGroupStore.pagination.perPage"
+                        :totalRecords="filteredAccessGroupsLocal.length"
+                        :loading="accessGroupStore.loading"
+                        paginatorTemplate="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink RowsPerPageDropdown"
+                        :rowsPerPageOptions="[5, 10, 25, 50]"
+                        @page="(e) => accessGroupStore.setPage(e.page + 1)"
+                        @rows="(e) => accessGroupStore.setPerPage(e.rows)"
                     stripedRows
                     tableStyle="min-width: 50rem"
                     class="p-datatable-sm"
                 >
                     <Column field="nome" header="Nome" sortable></Column>
                     <Column field="descricao" header="Descrição" sortable></Column>
+                    <Column v-if="isSuperAdmin" header="Tipo">
+                        <template #body="slotProps">
+                            <span
+                                v-if="slotProps.data.tipo === 'especial'"
+                                style="background: #FF8C00; color: #fff; padding: 0.15em 0.5em; border-radius: 0.25em; font-size: 0.85em; font-weight: 500; min-width: 70px; display: inline-block; text-align: center;"
+                            >
+                                Especial
+                            </span>
+                            <span
+                                v-else
+                                style="background: #22c55e; color: #fff; padding: 0.15em 0.5em; border-radius: 0.25em; font-size: 0.85em; font-weight: 500; min-width: 70px; display: inline-block; text-align: center;"
+                            >
+                                Regular
+                            </span>
+                        </template>
+                    </Column>
                     <Column header="Permissões">
                         <template #body="{ data }">
                             <div class="flex gap-2">

@@ -106,26 +106,26 @@ onMounted(async () => {
             structure.value = { ...data };
             canEdit.value = data.pode_editar;
             
-             // adapta os valores para o formato { label, value }
-        if (data.classificacao_federal) {
-            structure.value.classificacao_federal = {
-                value: data.classificacao_federal,
-                label: structureStore.federalClassifications.find(
-                    opt => opt.value === data.classificacao_federal
-                )?.label || ''
-            };
-        }
+            // adapta os valores para o formato { label, value }
+            if (data.classificacao_federal) {
+                structure.value.classificacao_federal = {
+                    value: data.classificacao_federal,
+                    label: structureStore.federalClassifications.find(
+                        opt => opt.value === data.classificacao_federal
+                    )?.label || ''
+                };
+            }
 
-        if (data.classificacao_estadual) {
-            structure.value.classificacao_estadual = {
-                value: data.classificacao_estadual,
-                label: structureStore.stateClassifications.find(
-                    opt => opt.value === data.classificacao_estadual
-                )?.label || ''
-            };
-        }
+            if (data.classificacao_estadual) {
+                structure.value.classificacao_estadual = {
+                    value: data.classificacao_estadual,
+                    label: structureStore.stateClassifications.find(
+                        opt => opt.value === data.classificacao_estadual
+                    )?.label || ''
+                };
+            }
 
-        canEdit.value = data.pode_editar;
+            canEdit.value = data.pode_editar;
         } else {
             toast.add({
                 severity: 'error',
@@ -137,9 +137,6 @@ onMounted(async () => {
             router.push('/structures');
         }
     }
-
-    
-    
 
     //console.log('entrou 1');//para debug
     // Buscar comentários da estrutura
@@ -247,8 +244,6 @@ const saveStructure = async () => {
             let payload = { 
                 ...structure.value, 
                 justificativa: justificativa.value,
-                 classificacao_federal: structure.value.classificacao_federal?.value || null,
-                classificacao_estadual: structure.value.classificacao_estadual?.value || null
             };
             if (isSuperAdmin.value && route.query.empresaId) {
                 payload.empresa_id = Number(route.query.empresaId);
@@ -351,7 +346,22 @@ async function adicionarComentario() {
 }
 
 function exportarEstrutura() {
-    exportarEstruturaUtil(structure.value);
+    const estruturaExport = { ...structure.value };
+    // Federal
+    if (estruturaExport.classificacao_federal) {
+        const federal = structureStore.federalClassificationOptions.find(
+            opt => opt.value === estruturaExport.classificacao_federal
+        );
+        if (federal) estruturaExport.classificacao_federal = federal.label;
+    }
+    // Estadual
+    if (estruturaExport.classificacao_estadual) {
+        const estadual = structureStore.stateClassificationOptions.find(
+            opt => opt.value === estruturaExport.classificacao_estadual
+        );
+        if (estadual) estruturaExport.classificacao_estadual = estadual.label;
+    }
+    exportarEstruturaUtil(estruturaExport);
 }
 
 // Arquivos de classificação
@@ -669,7 +679,7 @@ function formatDateTime(dateStr) {
                                         <label for="elevacao_crista" class="block mb-2">Elevação da Crista</label>
                                         <div class="flex gap-2">
                                             <InputNumber fluid id="elevacao_crista" v-model="structure.elevacao_crista" :minFractionDigits="1" :maxFractionDigits="3" :class="{ 'p-invalid': validationErrors.elevacao_crista }" />
-                                            <Select v-model="structure.unidade_elevacao_crista" :options="unidadeComprimento" class="w-24" />
+                                            <Select v-model="structure.unidade_elevacao_crista" :options="unidadeComprimento" class="unit-select" />
                                         </div>
                                         <small v-if="validationErrors.elevacao_crista" class="p-error">{{ validationErrors.elevacao_crista }}</small>
                                     </div>
@@ -678,7 +688,7 @@ function formatDateTime(dateStr) {
                                         <label for="elevacao_base" class="block mb-2">Elevação da Base</label>
                                         <div class="flex gap-2">
                                             <InputNumber fluid id="elevacao_base" v-model="structure.elevacao_base" :minFractionDigits="1" :maxFractionDigits="3" :class="{ 'p-invalid': validationErrors.elevacao_base }" />
-                                            <Select v-model="structure.unidade_elevacao_base" :options="unidadeComprimento" class="w-24" />
+                                            <Select v-model="structure.unidade_elevacao_base" :options="unidadeComprimento" class="unit-select" />
                                         </div>
                                         <small v-if="validationErrors.elevacao_base" class="p-error">{{ validationErrors.elevacao_base }}</small>
                                     </div>
@@ -687,7 +697,7 @@ function formatDateTime(dateStr) {
                                         <label for="altura_maxima_federal" class="block mb-2">Altura máxima da barragem (Lei Federal 14.066/2020)</label>
                                         <div class="flex gap-2">
                                             <InputNumber fluid id="altura_maxima_federal" v-model="structure.altura_maxima_federal" :minFractionDigits="1" :maxFractionDigits="3" :class="{ 'p-invalid': validationErrors.altura_maxima_federal }" />
-                                            <Select v-model="structure.unidade_altura_maxima_federal" :options="unidadeComprimento" class="w-24" />
+                                            <Select v-model="structure.unidade_altura_maxima_federal" :options="unidadeComprimento" class="unit-select" />
                                         </div>
                                         <small v-if="validationErrors.altura_maxima_federal" class="p-error">{{ validationErrors.altura_maxima_federal }}</small>
                                     </div>
@@ -696,7 +706,7 @@ function formatDateTime(dateStr) {
                                         <label for="altura_maxima_estadual" class="block mb-2">Altura máxima da barragem (Lei Estadual 23.291/2019)</label>
                                         <div class="flex gap-2">
                                             <InputNumber fluid id="altura_maxima_estadual" v-model="structure.altura_maxima_estadual" :minFractionDigits="1" :maxFractionDigits="3" :class="{ 'p-invalid': validationErrors.altura_maxima_estadual }" />
-                                            <Select v-model="structure.unidade_altura_maxima_estadual" :options="unidadeComprimento" class="w-24" />
+                                            <Select v-model="structure.unidade_altura_maxima_estadual" :options="unidadeComprimento" class="unit-select" />
                                         </div>
                                         <small v-if="validationErrors.altura_maxima_estadual" class="p-error">{{ validationErrors.altura_maxima_estadual }}</small>
                                     </div>
@@ -713,7 +723,7 @@ function formatDateTime(dateStr) {
                                         <label for="area_reservatorio_crista" class="block mb-2">Área do reservatório (até a crista)</label>
                                         <div class="flex gap-2">
                                             <InputNumber fluid id="area_reservatorio_crista" v-model="structure.area_reservatorio_crista" :minFractionDigits="1" :maxFractionDigits="3" :class="{ 'p-invalid': validationErrors.area_reservatorio_crista }" />
-                                            <Select v-model="structure.unidade_area_reservatorio_crista" :options="unidadesArea" class="w-24" />
+                                            <Select v-model="structure.unidade_area_reservatorio_crista" :options="unidadesArea" class="unit-select" />
                                         </div>
                                         <small v-if="validationErrors.area_reservatorio_crista" class="p-error">{{ validationErrors.area_reservatorio_crista }}</small>
                                     </div>
@@ -729,7 +739,7 @@ function formatDateTime(dateStr) {
                                                 :maxFractionDigits="3"
                                                 :class="{ 'p-invalid': validationErrors.area_reservatorio_soleira }"
                                             />
-                                            <Select v-model="structure.unidade_area_reservatorio_soleira" :options="unidadesArea" class="w-24" />
+                                            <Select v-model="structure.unidade_area_reservatorio_soleira" :options="unidadesArea" class="unit-select" />
                                         </div>
                                         <small v-if="validationErrors.area_reservatorio_soleira" class="p-error">{{ validationErrors.area_reservatorio_soleira }}</small>
                                     </div>
@@ -745,7 +755,7 @@ function formatDateTime(dateStr) {
                                                 :maxFractionDigits="3"
                                                 :class="{ 'p-invalid': validationErrors.altura_maxima_entre_bermas }"
                                             />
-                                            <Select v-model="structure.unidade_altura_maxima_entre_bermas" :options="unidadeComprimento" class="w-24" />
+                                            <Select v-model="structure.unidade_altura_maxima_entre_bermas" :options="unidadeComprimento" class="unit-select" />
                                         </div>
                                         <small v-if="validationErrors.altura_maxima_entre_bermas" class="p-error">{{ validationErrors.altura_maxima_entre_bermas }}</small>
                                     </div>
@@ -754,7 +764,7 @@ function formatDateTime(dateStr) {
                                         <label for="largura_bermas" class="block mb-2">Largura das bermas</label>
                                         <div class="flex gap-2">
                                             <InputNumber fluid id="largura_bermas" v-model="structure.largura_bermas" :minFractionDigits="1" :maxFractionDigits="3" :class="{ 'p-invalid': validationErrors.largura_bermas }" />
-                                            <Select v-model="structure.unidade_largura_bermas" :options="unidadeComprimento" class="w-24" />
+                                            <Select v-model="structure.unidade_largura_bermas" :options="unidadeComprimento" class="unit-select" />
                                         </div>
                                         <small v-if="validationErrors.largura_bermas" class="p-error">{{ validationErrors.largura_bermas }}</small>
                                     </div>
@@ -801,7 +811,7 @@ function formatDateTime(dateStr) {
                                         <label for="area_bacia_contribuicao" class="block mb-2">Área da Bacia de Contribuição</label>
                                         <div class="flex gap-2">
                                             <InputNumber fluid id="area_bacia_contribuicao" v-model="structure.area_bacia_contribuicao" :minFractionDigits="1" :maxFractionDigits="3" :class="{ 'p-invalid': validationErrors.area_bacia_contribuicao }" />
-                                            <Select v-model="structure.unidade_area_bacia_contribuicao" :options="unidadesArea" class="w-24" />
+                                            <Select v-model="structure.unidade_area_bacia_contribuicao" :options="unidadesArea" class="unit-select" />
                                         </div>
                                         <small v-if="validationErrors.area_bacia_contribuicao" class="p-error">{{ validationErrors.area_bacia_contribuicao }}</small>
                                     </div>
@@ -810,7 +820,7 @@ function formatDateTime(dateStr) {
                                         <label for="waterMirrorArea" class="block mb-2">Área do Espelho d'água</label>
                                         <div class="flex gap-2">
                                             <InputNumber fluid id="waterMirrorArea" v-model="structure.area_espelho_dagua" :minFractionDigits="1" :maxFractionDigits="3" :class="{ 'p-invalid': validationErrors.area_espelho_dagua }" />
-                                            <Select v-model="structure.unidade_area_espelho_dagua" :options="unidadesArea" class="w-24" />
+                                            <Select v-model="structure.unidade_area_espelho_dagua" :options="unidadesArea" class="unit-select" />
                                         </div>
                                         <small v-if="validationErrors.area_espelho_dagua" class="p-error">{{ validationErrors.area_espelho_dagua }}</small>
                                     </div>
@@ -819,7 +829,7 @@ function formatDateTime(dateStr) {
                                         <label for="maximumOperationalNA" class="block mb-2">NA Máximo Operacional</label>
                                         <div class="flex gap-2">
                                             <InputNumber fluid id="maximumOperationalNA" v-model="structure.na_maximo_operacional" :minFractionDigits="1" :maxFractionDigits="3" :class="{ 'p-invalid': validationErrors.na_maximo_operacional }" />
-                                            <Select v-model="structure.unidade_na_maximo_operacional" :options="unidadeComprimento" class="w-24" />
+                                            <Select v-model="structure.unidade_na_maximo_operacional" :options="unidadeComprimento" class="unit-select" />
                                         </div>
                                         <small v-if="validationErrors.na_maximo_operacional" class="p-error">{{ validationErrors.na_maximo_operacional }}</small>
                                     </div>
@@ -828,7 +838,7 @@ function formatDateTime(dateStr) {
                                         <label for="maximumMaximumNA" class="block mb-2">NA Máximo Maximorum</label>
                                         <div class="flex gap-2">
                                             <InputNumber fluid id="maximumMaximumNA" v-model="structure.na_maximo_maximorum" :minFractionDigits="1" :maxFractionDigits="3" :class="{ 'p-invalid': validationErrors.na_maximo_maximorum }" />
-                                            <Select v-model="structure.unidade_na_maximo_maximorum" :options="unidadeComprimento" class="w-24" />
+                                            <Select v-model="structure.unidade_na_maximo_maximorum" :options="unidadeComprimento" class="unit-select" />
                                         </div>
                                         <small v-if="validationErrors.na_maximo_maximorum" class="p-error">{{ validationErrors.na_maximo_maximorum }}</small>
                                     </div>
@@ -837,7 +847,7 @@ function formatDateTime(dateStr) {
                                         <label for="freeBoard" class="block mb-2">Borda Livre (NA Máximo Maximorum)</label>
                                         <div class="flex gap-2">
                                             <InputNumber fluid id="freeBoard" v-model="structure.borda_livre" :minFractionDigits="1" :maxFractionDigits="3" :class="{ 'p-invalid': validationErrors.borda_livre }" />
-                                            <Select v-model="structure.unidade_borda_livre" :options="unidadeComprimento" class="w-24" />
+                                            <Select v-model="structure.unidade_borda_livre" :options="unidadeComprimento" class="unit-select" />
                                         </div>
                                         <small v-if="validationErrors.borda_livre" class="p-error">{{ validationErrors.borda_livre }}</small>
                                     </div>
@@ -853,7 +863,7 @@ function formatDateTime(dateStr) {
                                                 :maxFractionDigits="3"
                                                 :class="{ 'p-invalid': validationErrors.volume_transito_cheias }"
                                             />
-                                            <Select v-model="structure.unidade_volume_transito_cheias" :options="unidadesVolume" class="w-24" />
+                                            <Select v-model="structure.unidade_volume_transito_cheias" :options="unidadesVolume" class="unit-select" />
                                         </div>
                                         <small v-if="validationErrors.volume_transito_cheias" class="p-error">{{ validationErrors.volume_transito_cheias }}</small>
                                     </div>
@@ -1001,6 +1011,12 @@ function formatDateTime(dateStr) {
 </template>
 
 <style scoped>
+/* Padronização da largura dos campos de seleção de unidade */
+.unit-select {
+    min-width: 3.5rem;
+    max-width: 6.5rem;
+    width: 100%;
+}
 .structures-edit h1 {
     margin-bottom: 1.5rem;
 }

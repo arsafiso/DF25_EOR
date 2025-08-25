@@ -176,7 +176,7 @@ export function exportStructureWord(structure, layoutTabela) {
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `Características técnicas da estrutura ${structure.finalidade || 'null'}.docx`;
+        a.download = `Características técnicas da estrutura ${structure.nome || 'null'}.docx`;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);

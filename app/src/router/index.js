@@ -100,7 +100,6 @@ const router = createRouter({
                     name: 'EditCompany',
                     component: CompaniesEdit
                 },
-
                 {
                     path: '/classificacao',
                     name: 'Classificacao',

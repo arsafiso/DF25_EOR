@@ -44,7 +44,7 @@ export const useUserStore = defineStore('users', () => {
         const adminOnlyMenu = [
             { label: 'Gerenciar Grupos de Acesso', icon: 'pi pi-fw pi-users', to: '/access-groups' },
             { label: 'Gerenciar Usuários', icon: 'pi pi-fw pi-users', to: '/users' },
-            { label: 'Gerenciar Empresas', icon: 'pi pi-building', to: '/companies' },
+            { label: isSuperAdmin.value ? 'Gerenciar Empresas' : 'Gerenciar Empresa', icon: 'pi pi-building', to: '/companies' },
         ];
         const superadminOnlyMenu = [
             { label: 'Classificação de Estruturas', icon: 'pi pi-id-card', to: '/classificacao' }

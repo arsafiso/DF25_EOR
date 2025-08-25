@@ -9,7 +9,7 @@ class GrupoAcesso extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['nome', 'descricao', 'company_id'];
+    protected $fillable = ['nome', 'descricao', 'company_id', 'tipo'];
 
     protected $table = 'grupos_acesso';
 

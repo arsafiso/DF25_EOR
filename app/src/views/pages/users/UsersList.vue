@@ -107,9 +107,11 @@ watch([searchQuery, selectedStatus], () => {
                     <template #start>
                         <div class="flex flex-wrap gap-2">
                             <InputText v-model="searchQuery" placeholder="Pesquisar por nome" class="w-full md:w-20rem" />
-                            <Button label="Novo Usuário" icon="pi pi-plus" class="p-button-success" @click="createUser" />
                         </div>
                     </template>
+                     <template #end>
+                             <Button label="Novo Usuário" icon="pi pi-plus" class="p-button-success" @click="createUser" />
+                     </template>
                 </Toolbar>
                 <DataTable
                     :value="userStore.filteredUsers"
@@ -125,9 +127,13 @@ watch([searchQuery, selectedStatus], () => {
                     <Column field="name" header="Nome de Usuário" sortable></Column>
                     <Column field="email" header="Email" sortable></Column>
                     <Column field="company_name" header="Empresa" sortable></Column>
-                    <Column header="Admin">
+                    <Column header="Nível de Acesso">
                         <template #body="slotProps">
-                            <Badge :value="slotProps.data.role" :severity="(slotProps.data.role == 'admin' || slotProps.data.role == 'superadmin') ? 'success' : 'info'" />
+                                <Badge
+                                    :value="slotProps.data.role"
+                                    :severity="(slotProps.data.role == 'admin' || slotProps.data.role == 'superadmin') ? 'success' : 'info'"
+                                    class="w-24 text-center text-xs py-1 px-2 rounded"
+                                />
                         </template>
                     </Column>
                     <Column header="Grupos">

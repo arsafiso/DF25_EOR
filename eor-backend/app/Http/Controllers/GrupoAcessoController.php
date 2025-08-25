@@ -24,9 +24,20 @@ class GrupoAcessoController extends Controller
                 $grupos = GrupoAcesso::where('company_id', $user->company_id)->get();
             }
 
+            $gruposArr = $grupos->map(function ($grupo) {
+                return [
+                    'id' => $grupo->id,
+                    'nome' => $grupo->nome,
+                    'descricao' => $grupo->descricao,
+                    'company_id' => $grupo->company_id,
+                    'tipo' => $grupo->tipo,
+                    'created_at' => $grupo->created_at,
+                    'updated_at' => $grupo->updated_at,
+                ];
+            });
             return response()->json([
                 'message' => 'Grupos de acesso listados com sucesso!',
-                'data' => $grupos,
+                'data' => $gruposArr,
             ], 200);
         } catch (\Exception $e) {
             return response()->json([
@@ -44,20 +55,21 @@ class GrupoAcessoController extends Controller
         $validated = $request->validate([
             'nome' => 'required|string|max:255|unique:grupos_acesso,nome',
             'descricao' => 'nullable|string',
-            'estruturas' => 'nullable|array', // Valida que estruturas é um array
-            'estruturas.*.estrutura_id' => 'required_with:estruturas|exists:estruturas,id', // Valida cada estrutura
-            'estruturas.*.nivel_acesso' => 'required_with:estruturas|in:sem_nivel,leitura,leitura_escrita', // Valida o nível de acesso
+            'estruturas' => 'nullable|array',
+            'estruturas.*.estrutura_id' => 'required_with:estruturas|exists:estruturas,id',
+            'estruturas.*.nivel_acesso' => 'required_with:estruturas|in:sem_nivel,leitura,leitura_escrita',
+            'special' => 'nullable|boolean',
         ]);
 
         try {
             $user = Auth::user();
             // Permite superadmin criar grupo para qualquer empresa
             //Log::info('Payload recebido para grupo de acesso:', $request->all());
+            $isSpecial = $request->input('special') ? true : false;
             $companyId = ($user->role === 'superadmin' && $request->input('company_id'))
                 ? $request->input('company_id')
                 : $user->company_id;
-            //Log::info('Company ID atribuído ao grupo:', ['company_id' => $companyId, 'user_id' => $user->id, 'role' => $user->role]);
-            if (!$companyId) {
+            if (!$companyId && !$isSpecial) {
                 return response()->json(['error' => 'Usuário não associado a uma empresa.'], 200);
             }
 
@@ -65,18 +77,18 @@ class GrupoAcessoController extends Controller
             $grupo = GrupoAcesso::create([
                 'nome' => $validated['nome'],
                 'descricao' => $validated['descricao'] ?? null,
-                'company_id' => $companyId,
+                'company_id' => $isSpecial ? null : $companyId,
+                'tipo' => $isSpecial ? 'especial' : 'regular',
             ]);
 
             // Verifica se há estruturas para associar
             if (!empty($validated['estruturas'])) {
                 foreach ($validated['estruturas'] as $estrutura) {
-                    // Busca estrutura no banco para validação do company_id
                     $estruturaModel = \App\Models\Estrutura::find($estrutura['estrutura_id']);
                     if (!$estruturaModel) {
                         return response()->json(['error' => 'Estrutura não encontrada.'], 422);
                     }
-                    if ($estrutura['nivel_acesso'] !== 'sem_nivel' && $estruturaModel->company_id != $grupo->company_id) {
+                    if (!$isSpecial && $estrutura['nivel_acesso'] !== 'sem_nivel' && $estruturaModel->company_id != $grupo->company_id) {
                         return response()->json([
                             'error' => 'Estrutura (' . $estruturaModel->id . ') não pertence à mesma empresa do grupo de acesso.'
                         ], 422);
@@ -125,6 +137,7 @@ class GrupoAcessoController extends Controller
                 'created_at' => $grupo->created_at,
                 'updated_at' => $grupo->updated_at,
                 'company_id' => $grupo->company_id,
+                'tipo' => $grupo->tipo,
                 'estruturas' => $grupo->estruturas->map(function ($estrutura) {
                     return [
                         'id' => $estrutura->id,
@@ -185,7 +198,7 @@ class GrupoAcessoController extends Controller
                     if (!$estruturaModel) {
                         return response()->json(['error' => 'Estrutura não encontrada.'], 422);
                     }
-                    if ($estrutura['nivel_acesso'] !== 'sem_nivel' && $estruturaModel->company_id != $grupo->company_id) {
+                    if ($grupo->tipo !== 'especial' && $estrutura['nivel_acesso'] !== 'sem_nivel' && $estruturaModel->company_id != $grupo->company_id) {
                         return response()->json([
                             'error' => 'Estrutura (' . $estruturaModel->id . ') não pertence à mesma empresa do grupo de acesso.'
                         ], 422);
@@ -247,16 +260,26 @@ class GrupoAcessoController extends Controller
     public function addUsersToGroup(Request $request, string $grupoId)
     {
         $validated = $request->validate([
-            'usuario_id' => 'required|exists:users,id', // Verifica se o usuário existe
+            'usuario_id' => 'required|exists:users,id',
         ]);
 
         try {
             $grupo = GrupoAcesso::findOrFail($grupoId);
             $usuario = \App\Models\User::find($validated['usuario_id']);
-            if (!$usuario || $usuario->company_id != $grupo->company_id) {
-                return response()->json([
-                    'error' => 'Usuário não pertence à empresa do grupo.'
-                ], 422);
+            $user = Auth::user();
+
+            if ($grupo->tipo === 'especial') {
+                if ($user->role !== 'superadmin') {
+                    return response()->json([
+                        'error' => 'Apenas superadmin pode adicionar usuários a grupos especiais.'
+                    ], 403);
+                }
+            } else {
+                if (!$usuario || $usuario->company_id != $grupo->company_id) {
+                    return response()->json([
+                        'error' => 'Usuário não pertence à empresa do grupo.'
+                    ], 422);
+                }
             }
             $grupo->usuarios()->attach($validated['usuario_id']);
             return response()->json([
@@ -300,8 +323,15 @@ class GrupoAcessoController extends Controller
             // Busca o grupo de acesso
             $grupo = GrupoAcesso::findOrFail($grupoId);
             $usuario = \App\Models\User::find($validated['usuario_id']);
-            if (!$usuario || $usuario->company_id != $grupo->company_id) {
-                return response()->json(['error' => 'Usuário não pertence à empresa do grupo.'], 422);
+            if ($grupo->tipo === 'especial') {
+
+                if (!$usuario) {
+                    return response()->json(['error' => 'Usuário não encontrado.'], 422);
+                }
+            } else {
+                if (!$usuario || $usuario->company_id != $grupo->company_id) {
+                    return response()->json(['error' => 'Usuário não pertence à empresa do grupo.'], 422);
+                }
             }
             $grupo->usuarios()->detach($validated['usuario_id']);
             return response()->json([
