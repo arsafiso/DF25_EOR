@@ -2,11 +2,12 @@
 import { useStructureStore } from '@/stores/structureStore';
 import { useUserStore } from '@/stores/userStore';
 import { useToast } from 'primevue';
-import { onMounted, ref, computed, watch } from 'vue';
+import { onMounted, ref, computed, watch, nextTick } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import axios from '@/libs/axios';
 import Calendar from 'primevue/calendar';
 import { exportarEstrutura as exportarEstruturaUtil } from '@/utils/expEstrutura';
+
 
 const justificativa = ref('');
 const route = useRoute();
@@ -84,11 +85,16 @@ const unidadesVolume = ['mm³', 'cm³', 'dm³', 'm³', 'dam³', 'hm³', 'km³'];
 // Validation
 const validationErrors = ref({});
 const activeTab = ref(0);
+let map = null;
 
 // Determine if we're editing or creating
 const isEditing = computed(() => route.params.id !== undefined);
 const structureId = computed(() => route.params.id);
 const formTitle = computed(() => (isEditing.value ? 'Editar Estrutura' : 'Criar Estrutura'));
+
+// Variáveis reativas para a latitude e longitude
+const latitude = ref(structure.latitude);
+const longitude = ref(structure.longitude);
 
 onMounted(async () => {
     if (!isEditing.value && route.query.empresaId) {
@@ -469,6 +475,55 @@ const auditFieldOptions = computed(() => {
         .map(field => ({ label: field, value: field }));
 });
 
+watch(activeTab, async (newVal) => {
+  if (newVal === 5) {
+    await nextTick();
+
+    if (!map) {
+      try {
+        // Coloque a linha do token aqui, antes de criar o mapa
+        mapboxgl.accessToken = 'pk.eyJ1IjoiZ2NvaW1icmEwNSIsImEiOiJjbWVzMXQ1enIwY3c2MmtweTlwZWhuNzFlIn0.BcjEAX8zp1odvUeLyVCfjA'; 
+
+        // O restante do seu código para criar o mapa
+        map = new mapboxgl.Map({
+          container: 'mapid',
+          style: {
+            version: 8,
+            sources: {
+              'osm-tiles': {
+                type: 'raster',
+                tiles: ['https://a.tile.openstreetmap.org/{z}/{x}/{y}.png'],
+                tileSize: 256,
+              },
+            },
+            layers: [
+              {
+                id: 'osm',
+                type: 'raster',
+                source: 'osm-tiles',
+                minzoom: 0,
+                maxzoom: 22,
+              },
+            ],
+          },
+          center: [-46.633308, -23.55052],
+          zoom: 13,
+        });
+
+        // Adicione o marcador
+        new mapboxgl.Marker()
+          .setLngLat([-46.633308, -23.55052])
+          .addTo(map);
+
+      } catch (e) {
+        console.error('Falha ao carregar o Mapbox:', e);
+      }
+    } else {
+      map.resize();
+    }
+  }
+});
+
 // Mapeamento dos nomes dos campos para exibição amigável
 const auditFieldLabels = {
     nome: 'Nome',
@@ -544,6 +599,7 @@ function formatDateTime(dateStr) {
                             <Tab :value="2">Detalhes Estruturais</Tab>
                             <Tab :value="3">Parâmetros Hidráulicos</Tab>
                             <Tab v-if="isAdmin || isSuperAdmin || canEdit" :value="4">Histórico de Alterações</Tab>
+                            <Tab :value="5">Localização</Tab>
                         </TabList>
 
                         <TabPanels>
@@ -785,7 +841,7 @@ function formatDateTime(dateStr) {
                                         <label for="fundacao" class="block mb-2">Fundação</label>
                                         <Textarea fluid id="fundacao" v-model="structure.fundacao" rows="3" :class="{ 'p-invalid': validationErrors.fundacao }" />
                                         <small v-if="validationErrors.fundacao" class="p-error">{{ validationErrors.fundacao }}</small>
-                                    </div>
+                                    </div> 
 
                                     <div class="col-span-12 mb-4">
                                         <label for="analises_estabilidade" class="block mb-2">Análises de Estabilidade e Percolação</label>
@@ -934,6 +990,39 @@ function formatDateTime(dateStr) {
                                     </div>
                                 </div>
                             </TabPanel>
+                            <TabPanel :value="5">
+                            <h4>Localização</h4>
+                                <div class="grid-location">
+                                    <div class="localion-inputs">
+
+                                        <div class="grid-location-lat-long">
+                                            <label for="local-name" class="block mb-2">Nome do local</label>
+                                            <div class="flex gap-2">
+                                                <InputText fluid class="p-location-name" v-model="structure.locationName" :class="{ 'p-invalid': validationErrors.locationName }" />
+                                            </div>
+                                            <small v-if="validationErrors.latitude" class="p-error">{{ validationErrors.latitude }}</small>
+                                        </div>
+
+                                        <div class="grid-location-lat-long">
+                                            <label for="latitude" class="block mb-2">Latitude</label>
+                                            <div class="flex gap-2">
+                                                <InputText fluid class="p-location" v-model="structure.latitude" :class="{ 'p-invalid': validationErrors.latitude }" />
+                                            </div>
+                                            <small v-if="validationErrors.latitude" class="p-error">{{ validationErrors.latitude }}</small>
+                                        </div>
+
+                                        <div class="grid-location-lat-long" style="padding-top: 2%;">
+                                            <label for="longitude" class="block mb-2">Longitude</label>
+                                            <div class="flex gap-2">
+                                                <InputText fluid class="p-location" v-model="structure.longitude" :class="{ 'p-invalid': validationErrors.longitude }" />
+                                            </div>
+                                            <small v-if="validationErrors.latitude" class="p-error">{{ validationErrors.longitude }}</small>
+                                        </div>
+                                    </div>
+                                     <div id="mapid" class="map"></div>
+                                    
+                                </div>
+                            </TabPanel>
                         </TabPanels>
                     </Tabs>
                     
@@ -1056,5 +1145,41 @@ th, td {
 }
 summary {
     outline: none;
+}
+
+.p-location{
+    width: 20%;
+}
+
+.grid-location {
+    display: flex;
+    height: 50hv;
+}
+
+.localion-inputs{
+    width: 40%;
+}
+
+.grid-location-lat-long{
+    width: 100%;
+    margin-top: 2%;
+}
+
+.p-location{
+    width: 70%;
+}
+
+.p-location-name{
+    width: 90%;
+}
+
+#mapid {
+  height: 60vh;
+  width: 100%;
+  background-color: #1769aa;
+}
+
+.map { 
+    width: 60%;
 }
 </style>
