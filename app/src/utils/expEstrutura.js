@@ -65,7 +65,7 @@ export function exportarEstrutura(structure) {
 
     const a = document.createElement('a');
     a.href = url;
-    a.download = `Estrutura_${structure.finalidade || 'null'}.xlsx`;
+    a.download = `Estrutura_${structure.nome || 'null'}.xlsx`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);

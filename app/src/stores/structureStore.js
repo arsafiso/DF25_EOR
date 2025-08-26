@@ -194,7 +194,7 @@ export const useStructureStore = defineStore('structures', () => {
         } catch (e) {
             console.error('Erro ao carregar as opções:', e);
         }
-        }
+    }
 
     const cdaClassificationOptions = [
         { label: 'Alta', value: 'high' },

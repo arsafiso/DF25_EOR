@@ -76,6 +76,16 @@ class Estrutura extends Model implements AuditableContract
         'volume_transito_cheias' => 'float',
     ];
 
+    public function classificacaoFederal()
+    {
+        return $this->belongsTo(ClassificacaoEstrutura::class, 'classificacao_federal')->select(['id', 'nome']);
+    }
+
+    public function classificacaoEstadual()
+    {
+        return $this->belongsTo(ClassificacaoEstrutura::class, 'classificacao_estadual')->select(['id', 'nome']);
+    }
+
     public function grupos()
     {
         return $this->hasMany(GrupoEstruturaAcesso::class, 'estrutura_id');
