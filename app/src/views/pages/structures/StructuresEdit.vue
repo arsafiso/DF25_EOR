@@ -2,11 +2,13 @@
 import { useStructureStore } from '@/stores/structureStore';
 import { useUserStore } from '@/stores/userStore';
 import { useToast } from 'primevue';
-import { onMounted, ref, computed, watch } from 'vue';
+import { onMounted, ref, computed, watch, nextTick } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import axios from '@/libs/axios';
 import Calendar from 'primevue/calendar';
 import { exportarEstrutura as exportarEstruturaUtil } from '@/utils/expEstrutura';
+
+
 
 const justificativa = ref('');
 const route = useRoute();
@@ -21,6 +23,9 @@ const isAdmin = computed(() => userStore.isAdmin);
 const isSuperAdmin = computed(() => userStore.isSuperAdmin);
 const canEdit = ref(false);
 
+const searchText = ref("");
+const errorMsg = ref("");
+
 const structure = ref({
     // Basic Information
     nome: '',
@@ -30,7 +35,9 @@ const structure = ref({
     classificacao_federal: null,
     classificacao_estadual: null,
     classificacao_cda: '',
-    empresa_id: null, 
+    empresa_id: null,
+    latitude: null,
+    longitude: null,
 
     // Technical Measurements
     elevacao_crista: null,
@@ -84,11 +91,14 @@ const unidadesVolume = ['mm³', 'cm³', 'dm³', 'm³', 'dam³', 'hm³', 'km³'];
 // Validation
 const validationErrors = ref({});
 const activeTab = ref(0);
+let map = null;
+let marker = null;
 
 // Determine if we're editing or creating
 const isEditing = computed(() => route.params.id !== undefined);
 const structureId = computed(() => route.params.id);
 const formTitle = computed(() => (isEditing.value ? 'Editar Estrutura' : 'Criar Estrutura'));
+
 
 onMounted(async () => {
     if (!isEditing.value && route.query.empresaId) {
@@ -99,6 +109,9 @@ onMounted(async () => {
     await structureStore.fetchFederalClassifications();
     await structureStore.fetchStateClassificationOptions();
 
+    // Carregar latitude e longitude
+    await structureStore.createStructure(structure.value);
+
     if (isEditing.value) {
         const { data, error } = await structureStore.getStructureById(structureId.value);
 
@@ -106,26 +119,26 @@ onMounted(async () => {
             structure.value = { ...data };
             canEdit.value = data.pode_editar;
             
-            // adapta os valores para o formato { label, value }
-            if (data.classificacao_federal) {
-                structure.value.classificacao_federal = {
-                    value: data.classificacao_federal,
-                    label: structureStore.federalClassifications.find(
-                        opt => opt.value === data.classificacao_federal
-                    )?.label || ''
-                };
-            }
+             // adapta os valores para o formato { label, value }
+        if (data.classificacao_federal) {
+            structure.value.classificacao_federal = {
+                value: data.classificacao_federal,
+                label: structureStore.federalClassifications.find(
+                    opt => opt.value === data.classificacao_federal
+                )?.label || ''
+            };
+        }
 
-            if (data.classificacao_estadual) {
-                structure.value.classificacao_estadual = {
-                    value: data.classificacao_estadual,
-                    label: structureStore.stateClassifications.find(
-                        opt => opt.value === data.classificacao_estadual
-                    )?.label || ''
-                };
-            }
+        if (data.classificacao_estadual) {
+            structure.value.classificacao_estadual = {
+                value: data.classificacao_estadual,
+                label: structureStore.stateClassifications.find(
+                    opt => opt.value === data.classificacao_estadual
+                )?.label || ''
+            };
+        }
 
-            canEdit.value = data.pode_editar;
+        canEdit.value = data.pode_editar;
         } else {
             toast.add({
                 severity: 'error',
@@ -137,6 +150,9 @@ onMounted(async () => {
             router.push('/structures');
         }
     }
+
+    
+    
 
     //console.log('entrou 1');//para debug
     // Buscar comentários da estrutura
@@ -244,6 +260,10 @@ const saveStructure = async () => {
             let payload = { 
                 ...structure.value, 
                 justificativa: justificativa.value,
+                classificacao_federal: structure.value.classificacao_federal?.value || null,
+                classificacao_estadual: structure.value.classificacao_estadual?.value || null,
+                latitude: Number(structure.value.latitude) || null,
+                longitude: Number(structure.value.longitude) || null,
             };
             if (isSuperAdmin.value && route.query.empresaId) {
                 payload.empresa_id = Number(route.query.empresaId);
@@ -346,22 +366,7 @@ async function adicionarComentario() {
 }
 
 function exportarEstrutura() {
-    const estruturaExport = { ...structure.value };
-    // Federal
-    if (estruturaExport.classificacao_federal) {
-        const federal = structureStore.federalClassificationOptions.find(
-            opt => opt.value === estruturaExport.classificacao_federal
-        );
-        if (federal) estruturaExport.classificacao_federal = federal.label;
-    }
-    // Estadual
-    if (estruturaExport.classificacao_estadual) {
-        const estadual = structureStore.stateClassificationOptions.find(
-            opt => opt.value === estruturaExport.classificacao_estadual
-        );
-        if (estadual) estruturaExport.classificacao_estadual = estadual.label;
-    }
-    exportarEstruturaUtil(estruturaExport);
+    exportarEstruturaUtil(structure.value);
 }
 
 // Arquivos de classificação
@@ -431,6 +436,144 @@ async function downloadArquivoClassificacao(arquivo) {
     }
 }
 
+
+
+// Arquivos de Mapa Dam Break
+const arquivosMapaDamBreak = ref([]);
+const uploadLoadingMapaDamBreak = ref(false);
+
+// Carregar arquivos existentes
+async function carregarArquivosMapaDamBreak() {
+    if (!structureId.value) return;
+    try {
+        const resp = await axios.get(`/estruturas/${structureId.value}/arquivos-mapa-dam-break`);
+        arquivosMapaDamBreak.value = resp.data;
+    } catch (e) {
+        toast.add({ severity: 'error', summary: 'Erro', detail: 'Falha ao carregar arquivos', life: 3000 });
+    }
+}
+
+// Upload de arquivos
+async function uploadArquivosMapaDamBreak(event) {
+    const files = event.target.files;
+    if (!files.length) return;
+    uploadLoading.value = true;
+    const formData = new FormData();
+    for (const file of files) {
+        formData.append('files[]', file);
+    }
+    try {
+        await axios.post(
+            `/estruturas/${structureId.value}/arquivos-mapa-dam-break`,
+            formData,
+            { headers: { 'Content-Type': 'multipart/form-data' } }
+        );
+        await carregarArquivosMapaDamBreak();
+        toast.add({ severity: 'success', summary: 'Sucesso', detail: 'Arquivo(s) enviado(s) com sucesso', life: 3000 });
+    } catch (e) {
+        toast.add({ severity: 'error', summary: 'Erro', detail: 'Falha ao enviar arquivo(s)', life: 3000 });
+    }
+    uploadLoading.value = false;
+    event.target.value = '';
+}
+
+// Download de arquivo
+async function downloadArquivoMapaDamBreak(arquivo) {
+    try {
+        // Faz a solicitação para o backend para obter o arquivo
+        const response = await axios.get(
+            `/estruturas/${structureId.value}/arquivos-mapa-dam-break/${arquivo.id}/download`,
+            { responseType: 'blob' }
+        );
+
+        // Cria uma URL temporária
+        const url = window.URL.createObjectURL(new Blob([response.data]));
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', arquivo.nome_arquivo); 
+        document.body.appendChild(link);
+        link.click(); // Inicia o download
+        document.body.removeChild(link); // Remove o link temporário
+    } catch (error) {
+        console.error('Erro ao baixar o arquivo:', error);
+        toast.add({
+            severity: 'error',
+            summary: 'Erro',
+            detail: 'Falha ao baixar o arquivo',
+            life: 3000
+        });
+    }
+}
+
+
+
+// Arquivos de Seção II da PAEBM
+const arquivosSecaoIIPAEBM = ref([]);
+const uploadLoadingSecaoIIPAEBM = ref(false);
+
+// Carregar arquivos existentes
+async function carregarArquivosSecaoIIPAEBM() {
+    if (!structureId.value) return;
+    try {
+        const resp = await axios.get(`/estruturas/${structureId.value}/arquivos-secao-ii-paebm`);
+        arquivosSecaoIIPAEBM.value = resp.data;
+    } catch (e) {
+        toast.add({ severity: 'error', summary: 'Erro', detail: 'Falha ao carregar arquivos', life: 3000 });
+    }
+}
+// Upload de arquivos
+async function uploadArquivosSecaoIIPAEBM(event) {
+    uploadLoadingSecaoIIPAEBM.value = true; 
+    const files = event.target.files;
+    if (!files.length) return;
+    uploadLoading.value = true;
+    const formData = new FormData();
+    for (const file of files) {
+        formData.append('files[]', file);
+    }
+    try {
+        await axios.post(
+            `/estruturas/${structureId.value}/arquivos-secao-ii-paebm`,
+            formData,
+            { headers: { 'Content-Type': 'multipart/form-data' } }
+        );
+        await carregarArquivosSecaoIIPAEBM();
+        toast.add({ severity: 'success', summary: 'Sucesso', detail: 'Arquivo(s) enviado(s) com sucesso', life: 3000 });
+    } catch (e) {
+        toast.add({ severity: 'error', summary: 'Erro', detail: 'Falha ao enviar arquivo(s)', life: 3000 });
+    }
+    uploadLoading.value = false;
+    event.target.value = '';
+}
+
+// Download de arquivo
+async function downloadArquivoSecaoIIPAEBM(arquivo) {
+    try {
+        // Faz a solicitação para o backend para obter o arquivo
+        const response = await axios.get(
+            `/estruturas/${structureId.value}/arquivos-secao-ii-paebm/${arquivo.id}/download`,
+            { responseType: 'blob' }
+        );
+
+        // Cria uma URL temporária
+        const url = window.URL.createObjectURL(new Blob([response.data]));
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', arquivo.nome_arquivo); 
+        document.body.appendChild(link);
+        link.click(); // Inicia o download
+        document.body.removeChild(link); // Remove o link temporário
+    } catch (error) {
+        console.error('Erro ao baixar o arquivo:', error);
+        toast.add({
+            severity: 'error',
+            summary: 'Erro',
+            detail: 'Falha ao baixar o arquivo',
+            life: 3000
+        });
+    }
+}
+
 const audits = ref([]);
 const auditFilters = ref({
     user: '',
@@ -478,6 +621,72 @@ const auditFieldOptions = computed(() => {
         .sort((a, b) => a.localeCompare(b))
         .map(field => ({ label: field, value: field }));
 });
+
+watch(activeTab, async (newVal) => {
+  if (newVal === 5) {
+    await nextTick();
+
+    if (!map) {
+      try {
+        mapboxgl.accessToken = 'pk.eyJ1IjoiZ2NvaW1icmEwNSIsImEiOiJjbWVzMXQ1enIwY3c2MmtweTlwZWhuNzFlIn0.BcjEAX8zp1odvUeLyVCfjA';
+        const initialLng = structure.value.longitude != null ? Number(structure.value.longitude) : -46.633308;
+        const initialLat = structure.value.latitude != null ? Number(structure.value.latitude) : -23.55052;
+
+        map = new mapboxgl.Map({
+          container: 'mapid',
+          style: {
+            version: 8,
+            sources: {
+              'osm-tiles': {
+                type: 'raster',
+                tiles: ['https://a.tile.openstreetmap.org/{z}/{x}/{y}.png'],
+                tileSize: 256,
+              },
+            },
+            layers: [
+              {
+                id: 'osm',
+                type: 'raster',
+                source: 'osm-tiles',
+                minzoom: 0,
+                maxzoom: 22,
+              },
+            ],
+          },
+          center: [initialLng, initialLat],
+          zoom: 13,
+        });
+
+        marker = new mapboxgl.Marker()
+          .setLngLat([initialLng, initialLat])
+          .addTo(map);
+
+        watch(
+          () => [structure.value.latitude, structure.value.longitude],
+          ([lat, lng]) => {
+            if (lat != null && lng != null && map && marker) {
+              marker.setLngLat([lng, lat]);
+              map.setCenter([lng, lat]);
+            }
+          }
+        );
+
+        // Atualiza structure.value quando o marcador é movido
+        marker.on('dragend', () => {
+        const lngLat = marker.getLngLat();
+        structure.value.latitude = Number(lngLat.lat);
+        structure.value.longitude = Number(lngLat.lng);
+        });
+
+      } catch (e) {
+        console.error('Falha ao carregar o Mapbox:', e);
+      }
+    } else {
+      map.resize();
+    }
+  }
+});
+
 
 // Mapeamento dos nomes dos campos para exibição amigável
 const auditFieldLabels = {
@@ -554,6 +763,7 @@ function formatDateTime(dateStr) {
                             <Tab :value="2">Detalhes Estruturais</Tab>
                             <Tab :value="3">Parâmetros Hidráulicos</Tab>
                             <Tab v-if="isAdmin || isSuperAdmin || canEdit" :value="4">Histórico de Alterações</Tab>
+                            <Tab :value="5">Localização</Tab>
                         </TabList>
 
                         <TabPanels>
@@ -634,9 +844,10 @@ function formatDateTime(dateStr) {
                                         <small v-if="validationErrors.classificacao_cda" class="p-error">{{ validationErrors.classificacao_cda }}</small>
                                     </div>
 
+                                    
                                     <div class="col-span-12 mb-4">
-                                        <label class="block mb-2 font-semibold">Arquivos de Classificação</label>
                                         <div class="flex flex-col gap-2">
+                                            <label class="block mb font-semibold">Arquivos de Classificação</label>
                                             <div class="custom-file-upload-wrapper" v-if="isAdmin || isSuperAdmin || canEdit">
                                                 <input
                                                     id="file-upload"
@@ -669,6 +880,81 @@ function formatDateTime(dateStr) {
                                             </div>
                                             <div v-else class="text-gray-400">Nenhum arquivo enviado.</div>
                                         </div>
+
+
+                                        
+                                        <div class="flex flex-col gap-2">
+                                            <label class="block mb font-semibold" style="margin-top: 2%;">Mapa Dam Break</label>
+                                            <div class="custom-file-upload-wrapper" v-if="isAdmin || isSuperAdmin || canEdit">
+                                                <input
+                                                    id="file-upload-mapa-dam"
+                                                    type="file"
+                                                    multiple
+                                                    accept=".pdf,.csv,.xlsx,.ods"
+                                                    @change="uploadArquivosMapaDamBreak"
+                                                    :disabled="uploadLoadingMapaDamBreak"
+                                                    class="hidden"
+                                                />
+                                                <label for="file-upload-mapa-dam" class="custom-file-upload-btn">
+                                                    <i class="pi pi-upload mr-2"></i>
+                                                    <span>{{ uploadLoadingMapaDamBreak ? 'Enviando...' : 'Carregar Arquivos' }}</span>
+                                                </label>
+                                            </div>
+                                            <small class="text-gray-500 ml-0">PDF / CSV / XLSX / ODS</small>
+                                            <div v-if="arquivosMapaDamBreak.length">
+                                                <ul class="list-disc ml-4">
+                                                    <li v-for="arquivo in arquivosMapaDamBreak" :key="arquivo.id" class="flex items-center gap-2">
+                                                        <span>{{ arquivo.nome_arquivo }}</span>
+                                                        <Button
+                                                            icon="pi pi-download"
+                                                            size="small"
+                                                            text
+                                                            @click="downloadArquivoMapaDamBreak(arquivo)"
+                                                            title="Baixar"
+                                                        />
+                                                    </li>
+                                                </ul>
+                                            </div>
+                                            <div v-else class="text-gray-400">Nenhum arquivo enviado.</div>
+                                        </div>
+
+
+                                        
+                                        <div class="flex flex-col gap-2">
+                                            <label class="block mb font-semibold" style="margin-top: 2%;">Seção II do PAEBM</label>
+                                            <div class="custom-file-upload-wrapper" v-if="isAdmin || isSuperAdmin || canEdit">
+                                                <input
+                                                    id="file-upload-secao-ii"
+                                                    type="file"
+                                                    multiple
+                                                    accept=".pdf,.csv,.xlsx,.ods"
+                                                    @change="uploadArquivosSecaoIIPAEBM"
+                                                    :disabled="uploadLoadingSecaoIIPAEBM"
+                                                    class="hidden"
+                                                />
+                                                <label for="file-upload-secao-ii" class="custom-file-upload-btn">
+                                                    <i class="pi pi-upload mr-2"></i>
+                                                    <span>{{ uploadLoadingSecaoIIPAEBM ? 'Enviando...' : 'Carregar Arquivos' }}</span>
+                                                </label>
+                                            </div>
+                                            <small class="text-gray-500 ml-0">PDF / CSV / XLSX / ODS</small>
+                                            <div v-if="arquivosSecaoIIPAEBM.length">
+                                                <ul class="list-disc ml-4">
+                                                    <li v-for="arquivo in arquivosSecaoIIPAEBM" :key="arquivo.id" class="flex items-center gap-2">
+                                                        <span>{{ arquivo.nome_arquivo }}</span>
+                                                        <Button
+                                                            icon="pi pi-download"
+                                                            size="small"
+                                                            text
+                                                            @click="downloadArquivoSecaoIIPAEBM(arquivo)"
+                                                            title="Baixar"
+                                                        />
+                                                    </li>
+                                                </ul>
+                                            </div>
+                                            <div v-else class="text-gray-400">Nenhum arquivo enviado.</div>
+                                        </div>
+                                        
                                     </div>
                                 </div>
                             </TabPanel>
@@ -679,7 +965,7 @@ function formatDateTime(dateStr) {
                                         <label for="elevacao_crista" class="block mb-2">Elevação da Crista</label>
                                         <div class="flex gap-2">
                                             <InputNumber fluid id="elevacao_crista" v-model="structure.elevacao_crista" :minFractionDigits="1" :maxFractionDigits="3" :class="{ 'p-invalid': validationErrors.elevacao_crista }" />
-                                            <Select v-model="structure.unidade_elevacao_crista" :options="unidadeComprimento" class="unit-select" />
+                                            <Select v-model="structure.unidade_elevacao_crista" :options="unidadeComprimento" class="w-24" />
                                         </div>
                                         <small v-if="validationErrors.elevacao_crista" class="p-error">{{ validationErrors.elevacao_crista }}</small>
                                     </div>
@@ -688,7 +974,7 @@ function formatDateTime(dateStr) {
                                         <label for="elevacao_base" class="block mb-2">Elevação da Base</label>
                                         <div class="flex gap-2">
                                             <InputNumber fluid id="elevacao_base" v-model="structure.elevacao_base" :minFractionDigits="1" :maxFractionDigits="3" :class="{ 'p-invalid': validationErrors.elevacao_base }" />
-                                            <Select v-model="structure.unidade_elevacao_base" :options="unidadeComprimento" class="unit-select" />
+                                            <Select v-model="structure.unidade_elevacao_base" :options="unidadeComprimento" class="w-24" />
                                         </div>
                                         <small v-if="validationErrors.elevacao_base" class="p-error">{{ validationErrors.elevacao_base }}</small>
                                     </div>
@@ -697,7 +983,7 @@ function formatDateTime(dateStr) {
                                         <label for="altura_maxima_federal" class="block mb-2">Altura máxima da barragem (Lei Federal 14.066/2020)</label>
                                         <div class="flex gap-2">
                                             <InputNumber fluid id="altura_maxima_federal" v-model="structure.altura_maxima_federal" :minFractionDigits="1" :maxFractionDigits="3" :class="{ 'p-invalid': validationErrors.altura_maxima_federal }" />
-                                            <Select v-model="structure.unidade_altura_maxima_federal" :options="unidadeComprimento" class="unit-select" />
+                                            <Select v-model="structure.unidade_altura_maxima_federal" :options="unidadeComprimento" class="w-24" />
                                         </div>
                                         <small v-if="validationErrors.altura_maxima_federal" class="p-error">{{ validationErrors.altura_maxima_federal }}</small>
                                     </div>
@@ -706,7 +992,7 @@ function formatDateTime(dateStr) {
                                         <label for="altura_maxima_estadual" class="block mb-2">Altura máxima da barragem (Lei Estadual 23.291/2019)</label>
                                         <div class="flex gap-2">
                                             <InputNumber fluid id="altura_maxima_estadual" v-model="structure.altura_maxima_estadual" :minFractionDigits="1" :maxFractionDigits="3" :class="{ 'p-invalid': validationErrors.altura_maxima_estadual }" />
-                                            <Select v-model="structure.unidade_altura_maxima_estadual" :options="unidadeComprimento" class="unit-select" />
+                                            <Select v-model="structure.unidade_altura_maxima_estadual" :options="unidadeComprimento" class="w-24" />
                                         </div>
                                         <small v-if="validationErrors.altura_maxima_estadual" class="p-error">{{ validationErrors.altura_maxima_estadual }}</small>
                                     </div>
@@ -723,7 +1009,7 @@ function formatDateTime(dateStr) {
                                         <label for="area_reservatorio_crista" class="block mb-2">Área do reservatório (até a crista)</label>
                                         <div class="flex gap-2">
                                             <InputNumber fluid id="area_reservatorio_crista" v-model="structure.area_reservatorio_crista" :minFractionDigits="1" :maxFractionDigits="3" :class="{ 'p-invalid': validationErrors.area_reservatorio_crista }" />
-                                            <Select v-model="structure.unidade_area_reservatorio_crista" :options="unidadesArea" class="unit-select" />
+                                            <Select v-model="structure.unidade_area_reservatorio_crista" :options="unidadesArea" class="w-24" />
                                         </div>
                                         <small v-if="validationErrors.area_reservatorio_crista" class="p-error">{{ validationErrors.area_reservatorio_crista }}</small>
                                     </div>
@@ -739,7 +1025,7 @@ function formatDateTime(dateStr) {
                                                 :maxFractionDigits="3"
                                                 :class="{ 'p-invalid': validationErrors.area_reservatorio_soleira }"
                                             />
-                                            <Select v-model="structure.unidade_area_reservatorio_soleira" :options="unidadesArea" class="unit-select" />
+                                            <Select v-model="structure.unidade_area_reservatorio_soleira" :options="unidadesArea" class="w-24" />
                                         </div>
                                         <small v-if="validationErrors.area_reservatorio_soleira" class="p-error">{{ validationErrors.area_reservatorio_soleira }}</small>
                                     </div>
@@ -755,7 +1041,7 @@ function formatDateTime(dateStr) {
                                                 :maxFractionDigits="3"
                                                 :class="{ 'p-invalid': validationErrors.altura_maxima_entre_bermas }"
                                             />
-                                            <Select v-model="structure.unidade_altura_maxima_entre_bermas" :options="unidadeComprimento" class="unit-select" />
+                                            <Select v-model="structure.unidade_altura_maxima_entre_bermas" :options="unidadeComprimento" class="w-24" />
                                         </div>
                                         <small v-if="validationErrors.altura_maxima_entre_bermas" class="p-error">{{ validationErrors.altura_maxima_entre_bermas }}</small>
                                     </div>
@@ -764,7 +1050,7 @@ function formatDateTime(dateStr) {
                                         <label for="largura_bermas" class="block mb-2">Largura das bermas</label>
                                         <div class="flex gap-2">
                                             <InputNumber fluid id="largura_bermas" v-model="structure.largura_bermas" :minFractionDigits="1" :maxFractionDigits="3" :class="{ 'p-invalid': validationErrors.largura_bermas }" />
-                                            <Select v-model="structure.unidade_largura_bermas" :options="unidadeComprimento" class="unit-select" />
+                                            <Select v-model="structure.unidade_largura_bermas" :options="unidadeComprimento" class="w-24" />
                                         </div>
                                         <small v-if="validationErrors.largura_bermas" class="p-error">{{ validationErrors.largura_bermas }}</small>
                                     </div>
@@ -795,7 +1081,7 @@ function formatDateTime(dateStr) {
                                         <label for="fundacao" class="block mb-2">Fundação</label>
                                         <Textarea fluid id="fundacao" v-model="structure.fundacao" rows="3" :class="{ 'p-invalid': validationErrors.fundacao }" />
                                         <small v-if="validationErrors.fundacao" class="p-error">{{ validationErrors.fundacao }}</small>
-                                    </div>
+                                    </div> 
 
                                     <div class="col-span-12 mb-4">
                                         <label for="analises_estabilidade" class="block mb-2">Análises de Estabilidade e Percolação</label>
@@ -811,7 +1097,7 @@ function formatDateTime(dateStr) {
                                         <label for="area_bacia_contribuicao" class="block mb-2">Área da Bacia de Contribuição</label>
                                         <div class="flex gap-2">
                                             <InputNumber fluid id="area_bacia_contribuicao" v-model="structure.area_bacia_contribuicao" :minFractionDigits="1" :maxFractionDigits="3" :class="{ 'p-invalid': validationErrors.area_bacia_contribuicao }" />
-                                            <Select v-model="structure.unidade_area_bacia_contribuicao" :options="unidadesArea" class="unit-select" />
+                                            <Select v-model="structure.unidade_area_bacia_contribuicao" :options="unidadesArea" class="w-24" />
                                         </div>
                                         <small v-if="validationErrors.area_bacia_contribuicao" class="p-error">{{ validationErrors.area_bacia_contribuicao }}</small>
                                     </div>
@@ -820,7 +1106,7 @@ function formatDateTime(dateStr) {
                                         <label for="waterMirrorArea" class="block mb-2">Área do Espelho d'água</label>
                                         <div class="flex gap-2">
                                             <InputNumber fluid id="waterMirrorArea" v-model="structure.area_espelho_dagua" :minFractionDigits="1" :maxFractionDigits="3" :class="{ 'p-invalid': validationErrors.area_espelho_dagua }" />
-                                            <Select v-model="structure.unidade_area_espelho_dagua" :options="unidadesArea" class="unit-select" />
+                                            <Select v-model="structure.unidade_area_espelho_dagua" :options="unidadesArea" class="w-24" />
                                         </div>
                                         <small v-if="validationErrors.area_espelho_dagua" class="p-error">{{ validationErrors.area_espelho_dagua }}</small>
                                     </div>
@@ -829,7 +1115,7 @@ function formatDateTime(dateStr) {
                                         <label for="maximumOperationalNA" class="block mb-2">NA Máximo Operacional</label>
                                         <div class="flex gap-2">
                                             <InputNumber fluid id="maximumOperationalNA" v-model="structure.na_maximo_operacional" :minFractionDigits="1" :maxFractionDigits="3" :class="{ 'p-invalid': validationErrors.na_maximo_operacional }" />
-                                            <Select v-model="structure.unidade_na_maximo_operacional" :options="unidadeComprimento" class="unit-select" />
+                                            <Select v-model="structure.unidade_na_maximo_operacional" :options="unidadeComprimento" class="w-24" />
                                         </div>
                                         <small v-if="validationErrors.na_maximo_operacional" class="p-error">{{ validationErrors.na_maximo_operacional }}</small>
                                     </div>
@@ -838,7 +1124,7 @@ function formatDateTime(dateStr) {
                                         <label for="maximumMaximumNA" class="block mb-2">NA Máximo Maximorum</label>
                                         <div class="flex gap-2">
                                             <InputNumber fluid id="maximumMaximumNA" v-model="structure.na_maximo_maximorum" :minFractionDigits="1" :maxFractionDigits="3" :class="{ 'p-invalid': validationErrors.na_maximo_maximorum }" />
-                                            <Select v-model="structure.unidade_na_maximo_maximorum" :options="unidadeComprimento" class="unit-select" />
+                                            <Select v-model="structure.unidade_na_maximo_maximorum" :options="unidadeComprimento" class="w-24" />
                                         </div>
                                         <small v-if="validationErrors.na_maximo_maximorum" class="p-error">{{ validationErrors.na_maximo_maximorum }}</small>
                                     </div>
@@ -847,7 +1133,7 @@ function formatDateTime(dateStr) {
                                         <label for="freeBoard" class="block mb-2">Borda Livre (NA Máximo Maximorum)</label>
                                         <div class="flex gap-2">
                                             <InputNumber fluid id="freeBoard" v-model="structure.borda_livre" :minFractionDigits="1" :maxFractionDigits="3" :class="{ 'p-invalid': validationErrors.borda_livre }" />
-                                            <Select v-model="structure.unidade_borda_livre" :options="unidadeComprimento" class="unit-select" />
+                                            <Select v-model="structure.unidade_borda_livre" :options="unidadeComprimento" class="w-24" />
                                         </div>
                                         <small v-if="validationErrors.borda_livre" class="p-error">{{ validationErrors.borda_livre }}</small>
                                     </div>
@@ -863,7 +1149,7 @@ function formatDateTime(dateStr) {
                                                 :maxFractionDigits="3"
                                                 :class="{ 'p-invalid': validationErrors.volume_transito_cheias }"
                                             />
-                                            <Select v-model="structure.unidade_volume_transito_cheias" :options="unidadesVolume" class="unit-select" />
+                                            <Select v-model="structure.unidade_volume_transito_cheias" :options="unidadesVolume" class="w-24" />
                                         </div>
                                         <small v-if="validationErrors.volume_transito_cheias" class="p-error">{{ validationErrors.volume_transito_cheias }}</small>
                                     </div>
@@ -944,6 +1230,31 @@ function formatDateTime(dateStr) {
                                     </div>
                                 </div>
                             </TabPanel>
+                            <TabPanel :value="5">
+                            <h4>Localização</h4>
+                                <div class="grid-location">
+                                    <div class="localion-inputs">
+
+                                        <div class="grid-location-lat-long">
+                                            <label for="latitude" class="block mb-2">Latitude</label>
+                                            <div class="flex gap-2">
+                                                <InputText fluid class="p-location" v-model="structure.latitude" :class="{ 'p-invalid': validationErrors.latitude }" />
+                                            </div>
+                                            <small v-if="validationErrors.latitude" class="p-error">{{ validationErrors.latitude }}</small>
+                                        </div>
+
+                                        <div class="grid-location-lat-long" style="padding-top: 2%;">
+                                            <label for="longitude" class="block mb-2">Longitude</label>
+                                            <div class="flex gap-2">
+                                                <InputText fluid class="p-location" v-model="structure.longitude" :class="{ 'p-invalid': validationErrors.longitude }" />
+                                            </div>
+                                            <small v-if="validationErrors.latitude" class="p-error">{{ validationErrors.longitude }}</small>
+                                        </div>
+                                    </div>
+                                     <div id="mapid" class="map"></div>
+                                
+                                </div>
+                            </TabPanel>
                         </TabPanels>
                     </Tabs>
                     
@@ -1011,12 +1322,6 @@ function formatDateTime(dateStr) {
 </template>
 
 <style scoped>
-/* Padronização da largura dos campos de seleção de unidade */
-.unit-select {
-    min-width: 3.5rem;
-    max-width: 6.5rem;
-    width: 100%;
-}
 .structures-edit h1 {
     margin-bottom: 1.5rem;
 }
@@ -1072,5 +1377,41 @@ th, td {
 }
 summary {
     outline: none;
+}
+
+.p-location{
+    width: 20%;
+}
+
+.grid-location {
+    display: flex;
+    height: 50hv;
+}
+
+.localion-inputs{
+    width: 40%;
+}
+
+.grid-location-lat-long{
+    width: 100%;
+    margin-top: 2%;
+}
+
+.p-location{
+    width: 70%;
+}
+
+.p-location-name{
+    width: 90%;
+}
+
+#mapid {
+  height: 60vh;
+  width: 100%;
+  background-color: #1769aa;
+}
+
+.map { 
+    width: 60%;
 }
 </style>

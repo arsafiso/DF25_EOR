@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia';
-import { computed, ref, onMounted } from 'vue';
+import { computed, ref } from 'vue';
 import { makeApiRequest } from '@/libs/helpers';
 import axios from '@/libs/axios';
 
@@ -12,10 +12,16 @@ export const useStructureStore = defineStore('structures', () => {
     const pagination = ref({
         page: 1,
         perPage: 10,
-        total: 0
+        total: 0,
     });
 
     const filters = ref([]);
+
+    // Função para definir a localização da nova estrutura (agora é uma função)
+    function setStructureLocation(latitude, longitude) {
+        structure.value.latitude = latitude;
+        structure.value.longitude = longitude;
+    }
 
     const getStructureById = async (id) => {
         const { data, error: errorResponse } = await makeApiRequest({
@@ -69,27 +75,26 @@ export const useStructureStore = defineStore('structures', () => {
         pagination.value.total = data?.total || structures.value.length;
     }
 
-    async function createStructure(structure) {
-        loading.value = true;
-        error.value = null;
+    async function createStructure(structureData) {
+    loading.value = true;
+    error.value = null;
 
-        const { data, error: errorResponse } = await makeApiRequest({
-            url: '/estruturas',
-            method: 'post',
-            requestData: {
-                ...structure
-            }
-        });
+    const { data, error: errorResponse } = await makeApiRequest({
+        url: '/estruturas',
+        method: 'post',
+        requestData: { ...structureData } // agora existe
+    });
 
-        if (errorResponse.value) {
-            error.value = 'Failed to create structure';
-            console.error('Failed to create structure:', error.value);
-            return null;
-        }
-
-        structures.value.push(data.value);
-        return data.value;
+    if (errorResponse.value) {
+        error.value = 'Failed to create structure';
+        console.error('Failed to create structure:', error.value);
+        return null;
     }
+
+    structures.value.push(data.value);
+    return data.value;
+}
+
 
     async function updateStructure(id, structureData) {
         loading.value = true;
@@ -202,6 +207,7 @@ export const useStructureStore = defineStore('structures', () => {
         { label: 'Baixa', value: 'low' }
     ];
 
+    
     return {
         structures,
         loading,
@@ -210,6 +216,7 @@ export const useStructureStore = defineStore('structures', () => {
         filters,
         filteredStructures,
         paginatedStructures,
+        setStructureLocation,
         getStructureById,
         fetchStructures,
         createStructure,
