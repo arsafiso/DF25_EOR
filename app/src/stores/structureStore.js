@@ -12,12 +12,11 @@ export const useStructureStore = defineStore('structures', () => {
     const pagination = ref({
         page: 1,
         perPage: 10,
-        total: 0,
+        total: 0
     });
 
     const filters = ref([]);
 
-    // Função para definir a localização da nova estrutura (agora é uma função)
     function setStructureLocation(latitude, longitude) {
         structure.value.latitude = latitude;
         structure.value.longitude = longitude;
@@ -76,25 +75,24 @@ export const useStructureStore = defineStore('structures', () => {
     }
 
     async function createStructure(structureData) {
-    loading.value = true;
-    error.value = null;
+        loading.value = true;
+        error.value = null;
 
-    const { data, error: errorResponse } = await makeApiRequest({
-        url: '/estruturas',
-        method: 'post',
-        requestData: { ...structureData } // agora existe
-    });
+        const { data, error: errorResponse } = await makeApiRequest({
+            url: '/estruturas',
+            method: 'post',
+            requestData: { ...structureData }
+        });
 
-    if (errorResponse.value) {
-        error.value = 'Failed to create structure';
-        console.error('Failed to create structure:', error.value);
-        return null;
+        if (errorResponse.value) {
+            error.value = 'Failed to create structure';
+            console.error('Failed to create structure:', error.value);
+            return null;
+        }
+
+        structures.value.push(data.value);
+        return data.value;
     }
-
-    structures.value.push(data.value);
-    return data.value;
-}
-
 
     async function updateStructure(id, structureData) {
         loading.value = true;
@@ -207,7 +205,6 @@ export const useStructureStore = defineStore('structures', () => {
         { label: 'Baixa', value: 'low' }
     ];
 
-    
     return {
         structures,
         loading,

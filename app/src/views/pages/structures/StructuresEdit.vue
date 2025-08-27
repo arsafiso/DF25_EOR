@@ -8,8 +8,6 @@ import axios from '@/libs/axios';
 import Calendar from 'primevue/calendar';
 import { exportarEstrutura as exportarEstruturaUtil } from '@/utils/expEstrutura';
 
-
-
 const justificativa = ref('');
 const route = useRoute();
 const router = useRouter();
@@ -22,9 +20,6 @@ const { statusOptions, federalClassificationOptions, stateClassificationOptions,
 const isAdmin = computed(() => userStore.isAdmin);
 const isSuperAdmin = computed(() => userStore.isSuperAdmin);
 const canEdit = ref(false);
-
-const searchText = ref("");
-const errorMsg = ref("");
 
 const structure = ref({
     // Basic Information
@@ -99,7 +94,6 @@ const isEditing = computed(() => route.params.id !== undefined);
 const structureId = computed(() => route.params.id);
 const formTitle = computed(() => (isEditing.value ? 'Editar Estrutura' : 'Criar Estrutura'));
 
-
 onMounted(async () => {
     if (!isEditing.value && route.query.empresaId) {
         structure.value.empresa_id = Number(route.query.empresaId);
@@ -109,9 +103,6 @@ onMounted(async () => {
     await structureStore.fetchFederalClassifications();
     await structureStore.fetchStateClassificationOptions();
 
-    // Carregar latitude e longitude
-    await structureStore.createStructure(structure.value);
-
     if (isEditing.value) {
         const { data, error } = await structureStore.getStructureById(structureId.value);
 
@@ -119,26 +110,26 @@ onMounted(async () => {
             structure.value = { ...data };
             canEdit.value = data.pode_editar;
             
-             // adapta os valores para o formato { label, value }
-        if (data.classificacao_federal) {
-            structure.value.classificacao_federal = {
-                value: data.classificacao_federal,
-                label: structureStore.federalClassifications.find(
-                    opt => opt.value === data.classificacao_federal
-                )?.label || ''
-            };
-        }
+            // adapta os valores para o formato { label, value }
+            if (data.classificacao_federal) {
+                structure.value.classificacao_federal = {
+                    value: data.classificacao_federal,
+                    label: structureStore.federalClassificationOptions.find(
+                        opt => opt.value === data.classificacao_federal
+                    )?.label || ''
+                };
+            }
 
-        if (data.classificacao_estadual) {
-            structure.value.classificacao_estadual = {
-                value: data.classificacao_estadual,
-                label: structureStore.stateClassifications.find(
-                    opt => opt.value === data.classificacao_estadual
-                )?.label || ''
-            };
-        }
+            if (data.classificacao_estadual) {
+                structure.value.classificacao_estadual = {
+                    value: data.classificacao_estadual,
+                    label: structureStore.stateClassificationOptions.find(
+                        opt => opt.value === data.classificacao_estadual
+                    )?.label || ''
+                };
+            }
 
-        canEdit.value = data.pode_editar;
+            canEdit.value = data.pode_editar;
         } else {
             toast.add({
                 severity: 'error',
@@ -150,9 +141,6 @@ onMounted(async () => {
             router.push('/structures');
         }
     }
-
-    
-    
 
     //console.log('entrou 1');//para debug
     // Buscar comentários da estrutura
@@ -370,6 +358,8 @@ function exportarEstrutura() {
 }
 
 // Arquivos de classificação
+
+// --- GENÉRICO: ARQUIVOS ESTRUTURA ---
 const arquivosClassificacao = ref([]);
 const uploadLoading = ref(false);
 
@@ -377,112 +367,93 @@ const uploadLoading = ref(false);
 async function carregarArquivosClassificacao() {
     if (!structureId.value) return;
     try {
-        const resp = await axios.get(`/estruturas/${structureId.value}/arquivos-classificacao`);
+        const resp = await axios.get(`/estruturas/${structureId.value}/arquivos-estrutura`);
         arquivosClassificacao.value = resp.data;
     } catch (e) {
         toast.add({ severity: 'error', summary: 'Erro', detail: 'Falha ao carregar arquivos', life: 3000 });
     }
 }
 
-// Upload de arquivos
 async function uploadArquivosClassificacao(event) {
     const files = event.target.files;
     if (!files.length) return;
     uploadLoading.value = true;
     const formData = new FormData();
-    for (const file of files) {
-        formData.append('files[]', file);
-    }
+    formData.append('file', files[0]);
+    formData.append('estrutura_id', structureId.value);
+    formData.append('categoria', 'classificacao');
     try {
         await axios.post(
-            `/estruturas/${structureId.value}/arquivos-classificacao`,
+            `/estruturas/${structureId.value}/arquivos-estrutura`,
             formData,
             { headers: { 'Content-Type': 'multipart/form-data' } }
         );
         await carregarArquivosClassificacao();
-        toast.add({ severity: 'success', summary: 'Sucesso', detail: 'Arquivo(s) enviado(s) com sucesso', life: 3000 });
+        toast.add({ severity: 'success', summary: 'Sucesso', detail: 'Arquivo enviado com sucesso', life: 3000 });
     } catch (e) {
-        toast.add({ severity: 'error', summary: 'Erro', detail: 'Falha ao enviar arquivo(s)', life: 3000 });
+        toast.add({ severity: 'error', summary: 'Erro', detail: 'Falha ao enviar arquivo', life: 3000 });
     }
     uploadLoading.value = false;
     event.target.value = '';
 }
 
-// Download de arquivo
 async function downloadArquivoClassificacao(arquivo) {
     try {
-        // Faz a solicitação para o backend para obter o arquivo
-        const response = await axios.get(
-            `/estruturas/${structureId.value}/arquivos-classificacao/${arquivo.id}/download`,
-            { responseType: 'blob' }
-        );
-
-        // Cria uma URL temporária
+        const response = await axios.get(`/arquivos-estrutura/${arquivo.id}/download`, { responseType: 'blob' });
         const url = window.URL.createObjectURL(new Blob([response.data]));
         const link = document.createElement('a');
         link.href = url;
         link.setAttribute('download', arquivo.nome_arquivo); 
         document.body.appendChild(link);
-        link.click(); // Inicia o download
-        document.body.removeChild(link); // Remove o link temporário
+        link.click();
+        document.body.removeChild(link);
     } catch (error) {
-        console.error('Erro ao baixar o arquivo:', error);
-        toast.add({
-            severity: 'error',
-            summary: 'Erro',
-            detail: 'Falha ao baixar o arquivo',
-            life: 3000
-        });
+        toast.add({ severity: 'error', summary: 'Erro', detail: 'Falha ao baixar o arquivo', life: 3000 });
     }
 }
-
-
 
 // Arquivos de Mapa Dam Break
 const arquivosMapaDamBreak = ref([]);
 const uploadLoadingMapaDamBreak = ref(false);
 
-// Carregar arquivos existentes
 async function carregarArquivosMapaDamBreak() {
     if (!structureId.value) return;
     try {
-        const resp = await axios.get(`/estruturas/${structureId.value}/arquivos-mapa-dam-break`);
+        const resp = await axios.get(`/estruturas/${structureId.value}/arquivos-estrutura?categoria=dam_break`);
         arquivosMapaDamBreak.value = resp.data;
     } catch (e) {
         toast.add({ severity: 'error', summary: 'Erro', detail: 'Falha ao carregar arquivos', life: 3000 });
     }
 }
 
-// Upload de arquivos
 async function uploadArquivosMapaDamBreak(event) {
     const files = event.target.files;
     if (!files.length) return;
-    uploadLoading.value = true;
+    uploadLoadingMapaDamBreak.value = true;
     const formData = new FormData();
-    for (const file of files) {
-        formData.append('files[]', file);
-    }
+    formData.append('file', files[0]);
+    formData.append('estrutura_id', structureId.value);
+    formData.append('categoria', 'dam_break');
     try {
         await axios.post(
-            `/estruturas/${structureId.value}/arquivos-mapa-dam-break`,
+            `/estruturas/${structureId.value}/arquivos-estrutura`,
             formData,
             { headers: { 'Content-Type': 'multipart/form-data' } }
         );
         await carregarArquivosMapaDamBreak();
-        toast.add({ severity: 'success', summary: 'Sucesso', detail: 'Arquivo(s) enviado(s) com sucesso', life: 3000 });
+        toast.add({ severity: 'success', summary: 'Sucesso', detail: 'Arquivo enviado com sucesso', life: 3000 });
     } catch (e) {
-        toast.add({ severity: 'error', summary: 'Erro', detail: 'Falha ao enviar arquivo(s)', life: 3000 });
+        toast.add({ severity: 'error', summary: 'Erro', detail: 'Falha ao enviar arquivo', life: 3000 });
     }
-    uploadLoading.value = false;
+    uploadLoadingMapaDamBreak.value = false;
     event.target.value = '';
 }
 
-// Download de arquivo
 async function downloadArquivoMapaDamBreak(arquivo) {
     try {
         // Faz a solicitação para o backend para obter o arquivo
         const response = await axios.get(
-            `/estruturas/${structureId.value}/arquivos-mapa-dam-break/${arquivo.id}/download`,
+            `/estruturas/${structureId.value}/arquivos-estrutura/${arquivo.id}/download`,
             { responseType: 'blob' }
         );
 
@@ -492,66 +463,59 @@ async function downloadArquivoMapaDamBreak(arquivo) {
         link.href = url;
         link.setAttribute('download', arquivo.nome_arquivo); 
         document.body.appendChild(link);
-        link.click(); // Inicia o download
-        document.body.removeChild(link); // Remove o link temporário
+        link.click();
+        document.body.removeChild(link);
     } catch (error) {
-        console.error('Erro ao baixar o arquivo:', error);
-        toast.add({
-            severity: 'error',
-            summary: 'Erro',
-            detail: 'Falha ao baixar o arquivo',
-            life: 3000
-        });
+        toast.add({ severity: 'error', summary: 'Erro', detail: 'Falha ao baixar o arquivo', life: 3000 });
     }
 }
 
 
 
 // Arquivos de Seção II da PAEBM
+
 const arquivosSecaoIIPAEBM = ref([]);
 const uploadLoadingSecaoIIPAEBM = ref(false);
 
-// Carregar arquivos existentes
 async function carregarArquivosSecaoIIPAEBM() {
     if (!structureId.value) return;
     try {
-        const resp = await axios.get(`/estruturas/${structureId.value}/arquivos-secao-ii-paebm`);
+        const resp = await axios.get(`/estruturas/${structureId.value}/arquivos-estrutura`);
         arquivosSecaoIIPAEBM.value = resp.data;
     } catch (e) {
         toast.add({ severity: 'error', summary: 'Erro', detail: 'Falha ao carregar arquivos', life: 3000 });
     }
 }
-// Upload de arquivos
+
 async function uploadArquivosSecaoIIPAEBM(event) {
     uploadLoadingSecaoIIPAEBM.value = true; 
     const files = event.target.files;
     if (!files.length) return;
     uploadLoading.value = true;
     const formData = new FormData();
-    for (const file of files) {
-        formData.append('files[]', file);
-    }
+    formData.append('file', files[0]);
+    formData.append('estrutura_id', structureId.value);
+    formData.append('categoria', 'paebm_secao_ii');
     try {
         await axios.post(
-            `/estruturas/${structureId.value}/arquivos-secao-ii-paebm`,
+            `/estruturas/${structureId.value}/arquivos-estrutura`,
             formData,
             { headers: { 'Content-Type': 'multipart/form-data' } }
         );
         await carregarArquivosSecaoIIPAEBM();
-        toast.add({ severity: 'success', summary: 'Sucesso', detail: 'Arquivo(s) enviado(s) com sucesso', life: 3000 });
+        toast.add({ severity: 'success', summary: 'Sucesso', detail: 'Arquivo enviado com sucesso', life: 3000 });
     } catch (e) {
-        toast.add({ severity: 'error', summary: 'Erro', detail: 'Falha ao enviar arquivo(s)', life: 3000 });
+        toast.add({ severity: 'error', summary: 'Erro', detail: 'Falha ao enviar arquivo', life: 3000 });
     }
-    uploadLoading.value = false;
+    uploadLoadingSecaoIIPAEBM.value = false;
     event.target.value = '';
 }
 
-// Download de arquivo
 async function downloadArquivoSecaoIIPAEBM(arquivo) {
     try {
         // Faz a solicitação para o backend para obter o arquivo
         const response = await axios.get(
-            `/estruturas/${structureId.value}/arquivos-secao-ii-paebm/${arquivo.id}/download`,
+            `/estruturas/${structureId.value}/arquivos-estrutura/${arquivo.id}/download`,
             { responseType: 'blob' }
         );
 
@@ -561,16 +525,10 @@ async function downloadArquivoSecaoIIPAEBM(arquivo) {
         link.href = url;
         link.setAttribute('download', arquivo.nome_arquivo); 
         document.body.appendChild(link);
-        link.click(); // Inicia o download
-        document.body.removeChild(link); // Remove o link temporário
+        link.click();
+        document.body.removeChild(link);
     } catch (error) {
-        console.error('Erro ao baixar o arquivo:', error);
-        toast.add({
-            severity: 'error',
-            summary: 'Erro',
-            detail: 'Falha ao baixar o arquivo',
-            life: 3000
-        });
+        toast.add({ severity: 'error', summary: 'Erro', detail: 'Falha ao baixar o arquivo', life: 3000 });
     }
 }
 
@@ -623,12 +581,12 @@ const auditFieldOptions = computed(() => {
 });
 
 watch(activeTab, async (newVal) => {
-  if (newVal === 5) {
+  if (newVal === 4) {
     await nextTick();
 
     if (!map) {
       try {
-        mapboxgl.accessToken = 'pk.eyJ1IjoiZ2NvaW1icmEwNSIsImEiOiJjbWVzMXQ1enIwY3c2MmtweTlwZWhuNzFlIn0.BcjEAX8zp1odvUeLyVCfjA';
+        mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN;
         const initialLng = structure.value.longitude != null ? Number(structure.value.longitude) : -46.633308;
         const initialLat = structure.value.latitude != null ? Number(structure.value.latitude) : -23.55052;
 
@@ -673,9 +631,9 @@ watch(activeTab, async (newVal) => {
 
         // Atualiza structure.value quando o marcador é movido
         marker.on('dragend', () => {
-        const lngLat = marker.getLngLat();
-        structure.value.latitude = Number(lngLat.lat);
-        structure.value.longitude = Number(lngLat.lng);
+            const lngLat = marker.getLngLat();
+            structure.value.latitude = Number(lngLat.lat);
+            structure.value.longitude = Number(lngLat.lng);
         });
 
       } catch (e) {
@@ -759,11 +717,11 @@ function formatDateTime(dateStr) {
                     <Tabs class="mb-4" v-model:value="activeTab">
                         <TabList>
                             <Tab :value="0">Informações Básicas</Tab>
-                            <Tab :value="1">Medidas Técnicas</Tab>
-                            <Tab :value="2">Detalhes Estruturais</Tab>
+                            <Tab :value="1">Dados Geométricos</Tab>
+                            <Tab :value="2">Estudos Geotécnicos</Tab>
                             <Tab :value="3">Parâmetros Hidráulicos</Tab>
-                            <Tab v-if="isAdmin || isSuperAdmin || canEdit" :value="4">Histórico de Alterações</Tab>
-                            <Tab :value="5">Localização</Tab>
+                            <Tab :value="4">Localização</Tab>
+                            <Tab v-if="isAdmin || isSuperAdmin || canEdit" :value="5">Histórico de Alterações</Tab>
                         </TabList>
 
                         <TabPanels>
@@ -844,9 +802,8 @@ function formatDateTime(dateStr) {
                                         <small v-if="validationErrors.classificacao_cda" class="p-error">{{ validationErrors.classificacao_cda }}</small>
                                     </div>
 
-                                    
-                                    <div class="col-span-12 mb-4">
-                                        <div class="flex flex-col gap-2">
+                                    <div class="col-span-12 mb-4 flex gap-3">
+                                        <div class="flex flex-col gap-2" style="width: 100%;">
                                             <label class="block mb font-semibold">Arquivos de Classificação</label>
                                             <div class="custom-file-upload-wrapper" v-if="isAdmin || isSuperAdmin || canEdit">
                                                 <input
@@ -881,9 +838,7 @@ function formatDateTime(dateStr) {
                                             <div v-else class="text-gray-400">Nenhum arquivo enviado.</div>
                                         </div>
 
-
-                                        
-                                        <div class="flex flex-col gap-2">
+                                        <div class="flex flex-col gap-2" style="width: 100%;">
                                             <label class="block mb font-semibold" style="margin-top: 2%;">Mapa Dam Break</label>
                                             <div class="custom-file-upload-wrapper" v-if="isAdmin || isSuperAdmin || canEdit">
                                                 <input
@@ -920,7 +875,7 @@ function formatDateTime(dateStr) {
 
 
                                         
-                                        <div class="flex flex-col gap-2">
+                                        <div class="flex flex-col gap-2" style="width: 100%;">
                                             <label class="block mb font-semibold" style="margin-top: 2%;">Seção II do PAEBM</label>
                                             <div class="custom-file-upload-wrapper" v-if="isAdmin || isSuperAdmin || canEdit">
                                                 <input
@@ -954,7 +909,6 @@ function formatDateTime(dateStr) {
                                             </div>
                                             <div v-else class="text-gray-400">Nenhum arquivo enviado.</div>
                                         </div>
-                                        
                                     </div>
                                 </div>
                             </TabPanel>
@@ -1081,7 +1035,7 @@ function formatDateTime(dateStr) {
                                         <label for="fundacao" class="block mb-2">Fundação</label>
                                         <Textarea fluid id="fundacao" v-model="structure.fundacao" rows="3" :class="{ 'p-invalid': validationErrors.fundacao }" />
                                         <small v-if="validationErrors.fundacao" class="p-error">{{ validationErrors.fundacao }}</small>
-                                    </div> 
+                                    </div>
 
                                     <div class="col-span-12 mb-4">
                                         <label for="analises_estabilidade" class="block mb-2">Análises de Estabilidade e Percolação</label>
@@ -1162,7 +1116,7 @@ function formatDateTime(dateStr) {
                                 </div>
                             </TabPanel>
 
-                            <TabPanel :value="4" v-if="isAdmin || isSuperAdmin || canEdit">
+                            <TabPanel :value="5" v-if="isAdmin || isSuperAdmin || canEdit">
                                 <div class="grid gap-4">
                                     <!-- Filtros -->
                                     <div class="flex flex-wrap gap-2 mb-4 items-center">
@@ -1230,8 +1184,8 @@ function formatDateTime(dateStr) {
                                     </div>
                                 </div>
                             </TabPanel>
-                            <TabPanel :value="5">
-                            <h4>Localização</h4>
+                            <TabPanel :value="4">
+                                <h4>Localização</h4>
                                 <div class="grid-location">
                                     <div class="localion-inputs">
 
@@ -1408,10 +1362,6 @@ summary {
 #mapid {
   height: 60vh;
   width: 100%;
-  background-color: #1769aa;
-}
-
-.map { 
-    width: 60%;
+  background-color: #fff;
 }
 </style>

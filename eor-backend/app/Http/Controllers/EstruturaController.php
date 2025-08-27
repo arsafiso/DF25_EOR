@@ -77,6 +77,8 @@ class EstruturaController extends Controller
                         : $user->company_id,
                     'altura_maxima_federal' => $request->input('altura_maxima_federal'),
                     'altura_maxima_estadual' => $request->input('altura_maxima_estadual'),
+                    'latitude' => $request->input('latitude'),
+                    'longitude' => $request->input('longitude'),
                 ]
             ));
             return response()->json(['message' => 'Estrutura criada com sucesso!', 'data' => $estrutura], 201);
@@ -155,6 +157,8 @@ class EstruturaController extends Controller
                     'updated_by' => Auth::id(),
                     'altura_maxima_federal' => $request->input('altura_maxima_federal'),
                     'altura_maxima_estadual' => $request->input('altura_maxima_estadual'),
+                    'latitude' => $request->input('latitude'),
+                    'longitude' => $request->input('longitude'),
                 ]
             ));
             

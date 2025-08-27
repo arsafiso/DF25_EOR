@@ -5,6 +5,7 @@ use App\Http\Controllers\GrupoAcessoController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\ComentarioController;
 use App\Http\Controllers\ArquivoClassificacaoController;
+use App\Http\Controllers\ArquivoEstruturaController;
 use App\Http\Controllers\ClassificacaoEstruturaController;
 use App\Http\Controllers\CompanyController;
 use App\Http\Middleware\ForceJsonResponse;
@@ -49,6 +50,12 @@ Route::middleware(['auth:sanctum', ForceJsonResponse::class])->group(function ()
     Route::delete('/companies/{id}/users/{userId}', [CompanyController::class, 'removeUser']);
 
     Route::get('/estruturas/{id}/auditoria', [EstruturaController::class, 'auditoria']);
+
+    Route::get('/estruturas/{estruturaId}/arquivos-estrutura', [ArquivoEstruturaController::class, 'index']);
+    Route::post('/estruturas/{estruturaId}/arquivos-estrutura', [ArquivoEstruturaController::class, 'store']);
+    Route::get('/estruturas/{estruturaId}/arquivos-estrutura/{arquivoId}/download', [ArquivoEstruturaController::class, 'download']);
+    Route::delete('/estruturas/{estruturaId}/arquivos-estrutura/{arquivoId}', [ArquivoEstruturaController::class, 'destroy']);
+    Route::get('/estruturas/{estruturaId}/arquivos-estrutura/historico', [ArquivoEstruturaController::class, 'historico']);
 });
 
 Route::prefix('auth')->middleware(ForceJsonResponse::class)->group(function () {

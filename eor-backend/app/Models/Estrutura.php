@@ -54,6 +54,8 @@ class Estrutura extends Model implements AuditableContract
         'volume_transito_cheias',
         'unidade_volume_transito_cheias',
         'sistema_extravasor',
+        'latitude',
+        'longitude',
         'created_by',
         'updated_by',
         'company_id',
@@ -74,6 +76,8 @@ class Estrutura extends Model implements AuditableContract
         'na_maximo_maximorum' => 'float',
         'borda_livre' => 'float',
         'volume_transito_cheias' => 'float',
+        'latitude' => 'float',
+        'longitude' => 'float',
     ];
 
     public function classificacaoFederal()
