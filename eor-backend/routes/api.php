@@ -56,6 +56,7 @@ Route::middleware(['auth:sanctum', ForceJsonResponse::class])->group(function ()
     Route::get('/estruturas/{estruturaId}/arquivos-estrutura/{arquivoId}/download', [ArquivoEstruturaController::class, 'download']);
     Route::delete('/estruturas/{estruturaId}/arquivos-estrutura/{arquivoId}', [ArquivoEstruturaController::class, 'destroy']);
     Route::get('/estruturas/{estruturaId}/arquivos-estrutura/historico', [ArquivoEstruturaController::class, 'historico']);
+    Route::patch('/estruturas/{estruturaId}/arquivos-estrutura/{arquivoId}/marcar-historico', [ArquivoEstruturaController::class, 'marcarHistorico']);
 });
 
 Route::prefix('auth')->middleware(ForceJsonResponse::class)->group(function () {

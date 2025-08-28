@@ -252,6 +252,10 @@ const saveStructure = async () => {
                 classificacao_estadual: structure.value.classificacao_estadual?.value || null,
                 latitude: Number(structure.value.latitude) || null,
                 longitude: Number(structure.value.longitude) || null,
+
+                arquivos_classificacao: arquivosClassificacao.value.map(a => a.id),
+                arquivos_mapa_dam_break: arquivosMapaDamBreak.value.map(a => a.id),
+                arquivos_secao_ii_paebm: arquivosSecaoIIPAEBM.value.map(a => a.id),
             };
             if (isSuperAdmin.value && route.query.empresaId) {
                 payload.empresa_id = Number(route.query.empresaId);
@@ -367,50 +371,70 @@ const uploadLoading = ref(false);
 async function carregarArquivosClassificacao() {
     if (!structureId.value) return;
     try {
-        const resp = await axios.get(`/estruturas/${structureId.value}/arquivos-estrutura`);
+        const resp = await axios.get(`/estruturas/${structureId.value}/arquivos-estrutura?categoria=classificacao`);
         arquivosClassificacao.value = resp.data;
+        console.log('Arquivos carregados:', arquivosClassificacao.value);
     } catch (e) {
         toast.add({ severity: 'error', summary: 'Erro', detail: 'Falha ao carregar arquivos', life: 3000 });
     }
 }
 
+// --- UPLOAD DE ARQUIVOS ---
 async function uploadArquivosClassificacao(event) {
     const files = event.target.files;
     if (!files.length) return;
+
     uploadLoading.value = true;
     const formData = new FormData();
-    formData.append('file', files[0]);
-    formData.append('estrutura_id', structureId.value);
-    formData.append('categoria', 'classificacao');
+
     try {
+        // Adiciona todos os arquivos ao formData
+        for (let i = 0; i < files.length; i++) {
+            formData.append('files[]', files[i]);
+        }
+        formData.append('categoria', 'classificacao');
+        formData.append('estrutura_id', structureId.value);
+
         await axios.post(
             `/estruturas/${structureId.value}/arquivos-estrutura`,
             formData,
             { headers: { 'Content-Type': 'multipart/form-data' } }
         );
+
+        // Atualiza a lista de arquivos após envio
         await carregarArquivosClassificacao();
-        toast.add({ severity: 'success', summary: 'Sucesso', detail: 'Arquivo enviado com sucesso', life: 3000 });
+        toast.add({ severity: 'success', summary: 'Sucesso', detail: 'Arquivos enviados com sucesso', life: 3000 });
+
     } catch (e) {
-        toast.add({ severity: 'error', summary: 'Erro', detail: 'Falha ao enviar arquivo', life: 3000 });
+        toast.add({ severity: 'error', summary: 'Erro', detail: 'Falha ao enviar arquivos', life: 3000 });
     }
+
     uploadLoading.value = false;
     event.target.value = '';
 }
 
+// --- DOWNLOAD DE ARQUIVOS ---
 async function downloadArquivoClassificacao(arquivo) {
     try {
-        const response = await axios.get(`/arquivos-estrutura/${arquivo.id}/download`, { responseType: 'blob' });
+        const response = await axios.get(`/estruturas/${structureId.value}/arquivos-estrutura/${arquivo.id}/download`, { responseType: 'blob' });
         const url = window.URL.createObjectURL(new Blob([response.data]));
         const link = document.createElement('a');
         link.href = url;
-        link.setAttribute('download', arquivo.nome_arquivo); 
+        link.setAttribute('download', arquivo.nome_arquivo);
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
+
+         // Marcar o arquivo como histórico
+        await axios.patch(`/estruturas/${structureId.value}/arquivos-estrutura/${arquivo.id}/marcar-historico`);
+
+        // Atualizar a lista de arquivos
+        await carregarArquivosClassificacao();
     } catch (error) {
         toast.add({ severity: 'error', summary: 'Erro', detail: 'Falha ao baixar o arquivo', life: 3000 });
     }
 }
+
 
 // Arquivos de Mapa Dam Break
 const arquivosMapaDamBreak = ref([]);
@@ -429,47 +453,49 @@ async function carregarArquivosMapaDamBreak() {
 async function uploadArquivosMapaDamBreak(event) {
     const files = event.target.files;
     if (!files.length) return;
+
     uploadLoadingMapaDamBreak.value = true;
     const formData = new FormData();
-    formData.append('file', files[0]);
-    formData.append('estrutura_id', structureId.value);
-    formData.append('categoria', 'dam_break');
-    try {
-        await axios.post(
-            `/estruturas/${structureId.value}/arquivos-estrutura`,
-            formData,
-            { headers: { 'Content-Type': 'multipart/form-data' } }
-        );
-        await carregarArquivosMapaDamBreak();
-        toast.add({ severity: 'success', summary: 'Sucesso', detail: 'Arquivo enviado com sucesso', life: 3000 });
-    } catch (e) {
-        toast.add({ severity: 'error', summary: 'Erro', detail: 'Falha ao enviar arquivo', life: 3000 });
+
+    for (let i = 0; i < files.length; i++) {
+        formData.append('files[]', files[i]);
     }
+    formData.append('categoria', 'dam_break');
+    formData.append('estrutura_id', structureId.value);
+
+    try {
+        await axios.post(`/estruturas/${structureId.value}/arquivos-estrutura`, formData, {
+            headers: { 'Content-Type': 'multipart/form-data' }
+        });
+        await carregarArquivosMapaDamBreak();
+        toast.add({ severity: 'success', summary: 'Sucesso', detail: 'Arquivos enviados com sucesso', life: 3000 });
+    } catch (e) {
+        toast.add({ severity: 'error', summary: 'Erro', detail: 'Falha ao enviar arquivos', life: 3000 });
+    }
+
     uploadLoadingMapaDamBreak.value = false;
     event.target.value = '';
 }
 
 async function downloadArquivoMapaDamBreak(arquivo) {
     try {
-        // Faz a solicitação para o backend para obter o arquivo
-        const response = await axios.get(
-            `/estruturas/${structureId.value}/arquivos-estrutura/${arquivo.id}/download`,
-            { responseType: 'blob' }
-        );
-
-        // Cria uma URL temporária
+        const response = await axios.get(`/estruturas/${structureId.value}/arquivos-estrutura/${arquivo.id}/download`, { responseType: 'blob' });
         const url = window.URL.createObjectURL(new Blob([response.data]));
         const link = document.createElement('a');
         link.href = url;
-        link.setAttribute('download', arquivo.nome_arquivo); 
+        link.setAttribute('download', arquivo.nome_arquivo);
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
+        // Marcar o arquivo como histórico
+        await axios.patch(`/estruturas/${structureId.value}/arquivos-estrutura/${arquivo.id}/marcar-historico`);
+
+        // Atualizar a lista de arquivos
+        await carregarArquivosClassificacao();
     } catch (error) {
         toast.add({ severity: 'error', summary: 'Erro', detail: 'Falha ao baixar o arquivo', life: 3000 });
     }
 }
-
 
 
 // Arquivos de Seção II da PAEBM
@@ -480,7 +506,7 @@ const uploadLoadingSecaoIIPAEBM = ref(false);
 async function carregarArquivosSecaoIIPAEBM() {
     if (!structureId.value) return;
     try {
-        const resp = await axios.get(`/estruturas/${structureId.value}/arquivos-estrutura`);
+        const resp = await axios.get(`/estruturas/${structureId.value}/arquivos-estrutura?categoria=paebm_secao_ii`);
         arquivosSecaoIIPAEBM.value = resp.data;
     } catch (e) {
         toast.add({ severity: 'error', summary: 'Erro', detail: 'Falha ao carregar arquivos', life: 3000 });
@@ -488,56 +514,51 @@ async function carregarArquivosSecaoIIPAEBM() {
 }
 
 async function uploadArquivosSecaoIIPAEBM(event) {
-    uploadLoadingSecaoIIPAEBM.value = true; 
     const files = event.target.files;
     if (!files.length) return;
-    uploadLoading.value = true;
+
+    uploadLoadingSecaoIIPAEBM.value = true;
     const formData = new FormData();
-    formData.append('file', files[0]);
-    formData.append('estrutura_id', structureId.value);
-    formData.append('categoria', 'paebm_secao_ii');
-    try {
-        await axios.post(
-            `/estruturas/${structureId.value}/arquivos-estrutura`,
-            formData,
-            { headers: { 'Content-Type': 'multipart/form-data' } }
-        );
-        await carregarArquivosSecaoIIPAEBM();
-        toast.add({ severity: 'success', summary: 'Sucesso', detail: 'Arquivo enviado com sucesso', life: 3000 });
-    } catch (e) {
-        toast.add({ severity: 'error', summary: 'Erro', detail: 'Falha ao enviar arquivo', life: 3000 });
+
+    for (let i = 0; i < files.length; i++) {
+        formData.append('files[]', files[i]);
     }
+    formData.append('categoria', 'paebm_secao_ii');
+    formData.append('estrutura_id', structureId.value);
+
+    try {
+        await axios.post(`/estruturas/${structureId.value}/arquivos-estrutura`, formData, {
+            headers: { 'Content-Type': 'multipart/form-data' }
+        });
+        await carregarArquivosSecaoIIPAEBM();
+        toast.add({ severity: 'success', summary: 'Sucesso', detail: 'Arquivos enviados com sucesso', life: 3000 });
+    } catch (e) {
+        toast.add({ severity: 'error', summary: 'Erro', detail: 'Falha ao enviar arquivos', life: 3000 });
+    }
+
     uploadLoadingSecaoIIPAEBM.value = false;
     event.target.value = '';
 }
 
 async function downloadArquivoSecaoIIPAEBM(arquivo) {
     try {
-        // Faz a solicitação para o backend para obter o arquivo
-        const response = await axios.get(
-            `/estruturas/${structureId.value}/arquivos-estrutura/${arquivo.id}/download`,
-            { responseType: 'blob' }
-        );
-
-        // Cria uma URL temporária
+        const response = await axios.get(`/estruturas/${structureId.value}/arquivos-estrutura/${arquivo.id}/download`, { responseType: 'blob' });
         const url = window.URL.createObjectURL(new Blob([response.data]));
         const link = document.createElement('a');
         link.href = url;
-        link.setAttribute('download', arquivo.nome_arquivo); 
+        link.setAttribute('download', arquivo.nome_arquivo);
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
+        // Marcar o arquivo como histórico
+        await axios.patch(`/estruturas/${structureId.value}/arquivos-estrutura/${arquivo.id}/marcar-historico`);
+
+        // Atualizar a lista de arquivos
+        await carregarArquivosClassificacao();
     } catch (error) {
         toast.add({ severity: 'error', summary: 'Erro', detail: 'Falha ao baixar o arquivo', life: 3000 });
     }
 }
-
-const audits = ref([]);
-const auditFilters = ref({
-    user: '',
-    date: '',
-    field: ''
-});
 
 // Carregar auditoria ordenada por data decrescente
 async function carregarAuditoria() {
@@ -546,14 +567,23 @@ async function carregarAuditoria() {
         const resp = await axios.get(`/estruturas/${structureId.value}/auditoria?order=desc`);
         audits.value = resp.data;
     } catch (e) {
+        console.error('Erro ao carregar auditoria:', e.response?.data || e.message);
         toast.add({ severity: 'error', summary: 'Erro', detail: 'Falha ao carregar histórico de alterações', life: 3000 });
     }
 }
 
-onMounted(async () => {
-    // ...existing code...
+const carregarTodosArquivos = async () => {
     await carregarAuditoria();
-});
+    await carregarArquivosClassificacao();
+    await carregarArquivosMapaDamBreak();
+    await carregarArquivosSecaoIIPAEBM();
+};
+
+// Tenta carregar ao montar, caso structureId já esteja definido
+onMounted(async () => {
+    if (structureId.value) {
+        await carregarTodosArquivos();
+}});
 
 // Filtro de auditoria
 const filteredAudits = computed(() => {
