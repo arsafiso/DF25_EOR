@@ -20,6 +20,8 @@ const { statusOptions, federalClassificationOptions, stateClassificationOptions,
 const isAdmin = computed(() => userStore.isAdmin);
 const isSuperAdmin = computed(() => userStore.isSuperAdmin);
 const canEdit = ref(false);
+const auditFilters = ref({ user: '', date: '', field: '' });
+const audits = ref([]); 
 
 const structure = ref({
     // Basic Information
@@ -90,7 +92,7 @@ let map = null;
 let marker = null;
 
 // Determine if we're editing or creating
-const isEditing = computed(() => route.params.id !== undefined);
+const isEditing = ref(route.params.id !== undefined);
 const structureId = computed(() => route.params.id);
 const formTitle = computed(() => (isEditing.value ? 'Editar Estrutura' : 'Criar Estrutura'));
 
@@ -201,101 +203,102 @@ const validateForm = async () => {
 };
 
 const saveStructure = async () => {
-    const isValid = await validateForm();
-
-    if (!isValid) {
-        toast.add({
-            severity: 'error',
-            summary: 'Validation Error',
-            detail: 'Por favor, corrija os erros de validação antes de salvar',
-            life: 3000
-        });
-        return;
-    }
-    if (isEditing.value && (!justificativa.value || !justificativa.value.trim())) {
-        toast.add({
-            severity: 'error',
-            summary: 'Erro de Validação',
-            detail: 'O campo Justificativa da Modificação é obrigatório.',
-            life: 3000
-        });
-        return;
-    }
-
     try {
-        if (isEditing.value) {
-            const result = await structureStore.updateStructure(structureId.value, {...structure.value, justificativa: justificativa.value});
+        console.log("🔵 [saveStructure] Iniciando save...");
+        console.log("🔵 [saveStructure] isEditing:", isEditing.value);
+        console.log("🔵 [saveStructure] structureId:", structureId.value);
+        console.log("🔵 [saveStructure] structure:", structure.value);
+        console.log("🔵 [saveStructure] justificativa:", justificativa.value);
 
-            if (result) {
-                toast.add({
-                    severity: 'success',
-                    summary: 'Success',
-                    detail: 'Estrutura atualizada com sucesso',
-                    life: 3000
-                });
-
-                router.push('/structures');
-            } else {
-                toast.add({
-                    severity: 'error',
-                    summary: 'Error',
-                    detail: 'Erro ao atualizar a estrutura',
-                    life: 3000
-                });
-            }
-        } else {
-            // Superadmin usa empresa selecionada
-            let payload = { 
-                ...structure.value, 
-                justificativa: justificativa.value,
-                classificacao_federal: structure.value.classificacao_federal?.value || null,
-                classificacao_estadual: structure.value.classificacao_estadual?.value || null,
-                latitude: Number(structure.value.latitude) || null,
-                longitude: Number(structure.value.longitude) || null,
-
-                arquivos_classificacao: arquivosClassificacao.value.map(a => a.id),
-                arquivos_mapa_dam_break: arquivosMapaDamBreak.value.map(a => a.id),
-                arquivos_secao_ii_paebm: arquivosSecaoIIPAEBM.value.map(a => a.id),
-            };
-            if (isSuperAdmin.value && route.query.empresaId) {
-                payload.empresa_id = Number(route.query.empresaId);
-                payload.company_id = Number(route.query.empresaId);
-            }
-            const result = await structureStore.createStructure(payload);
-            if (result && result.error) {
-                toast.add({
-                    severity: 'error',
-                    summary: 'Error',
-                    detail: result.error,
-                    life: 3000
-                });
-            } else if (result) {
-                toast.add({
-                    severity: 'success',
-                    summary: 'Success',
-                    detail: 'Estrutura criada com sucesso',
-                    life: 3000
-                });
-
-                router.push('/structures');
-            } else {
-                toast.add({
-                    severity: 'error',
-                    summary: 'Error',
-                    detail: 'Erro ao atualizar a estrutura',
-                    life: 3000
-                });
-            }
+        // Validação do formulário
+        const isValid = await validateForm();
+        if (!isValid) {
+            toast.add({
+                severity: 'error',
+                summary: 'Validation Error',
+                detail: 'Por favor, corrija os erros de validação antes de salvar',
+                life: 3000
+            });
+            return;
         }
+
+        // Justificativa obrigatória ao editar
+        if (isEditing.value && (!justificativa.value || !justificativa.value.trim())) {
+            toast.add({
+                severity: 'error',
+                summary: 'Erro de Validação',
+                detail: 'O campo Justificativa da Modificação é obrigatório.',
+                life: 3000
+            });
+            return;
+        }
+
+        // Monta o payload
+        const payload = {
+            ...structure.value,
+            justificativa: justificativa.value,
+            classificacao_federal: structure.value.classificacao_federal?.value || null,
+            classificacao_estadual: structure.value.classificacao_estadual?.value || null,
+            latitude: Number(structure.value.latitude) || null,
+            longitude: Number(structure.value.longitude) || null,
+            arquivos_classificacao: arquivosClassificacao.value.map(a => a.id),
+            arquivos_mapa_dam_break: arquivosMapaDamBreak.value.map(a => a.id),
+            arquivos_secao_ii_paebm: arquivosSecaoIIPAEBM.value.map(a => a.id),
+        };
+
+        if (isSuperAdmin.value && route.query.empresaId) {
+            payload.empresa_id = Number(route.query.empresaId);
+            payload.company_id = Number(route.query.empresaId);
+        }
+
+        console.log("🟡 [saveStructure] Payload preparado:", payload);
+
+        let result;
+        if (isEditing.value) {
+            console.log("🟡 [saveStructure] Chamando updateStructure...");
+            result = await structureStore.updateStructure(structureId.value, payload);
+        } else {
+            console.log("🟡 [saveStructure] Chamando createStructure...");
+            result = await structureStore.createStructure(payload);
+        }
+
+        console.log("🟢 [saveStructure] Resultado da API:", result);
+
+        if (result && !result.error) {
+            toast.add({
+                severity: 'success',
+                summary: 'Success',
+                detail: isEditing.value ? 'Estrutura atualizada com sucesso' : 'Estrutura criada com sucesso',
+                life: 3000
+            });
+            router.push('/structures');
+        } else {
+            console.warn("⚠️ [saveStructure] API retornou falsy:", result);
+            toast.add({
+                severity: 'error',
+                summary: 'Error',
+                detail: isEditing.value ? 'Erro ao atualizar a estrutura' : 'Erro ao criar a estrutura',
+                life: 3000
+            });
+        }
+
     } catch (error) {
+        console.error("🔴 [saveStructure] Erro capturado:", error);
+        console.error("🔴 [saveStructure] Erro completo:", JSON.stringify(error, null, 2));
+
+        // Mostra mensagem detalhada do backend, se existir
+        const backendMessage = error?.response?.data?.message || error?.response?.data?.errors || error.message;
+
         toast.add({
             severity: 'error',
             summary: 'Error',
-            detail: 'Algo deu errado ao salvar a estrutura',
-            life: 3000
+            detail: backendMessage || 'Erro desconhecido ao salvar a estrutura',
+            life: 5000
         });
     }
 };
+
+
 
 const cancel = () => {
     router.push('/structures');
@@ -491,7 +494,7 @@ async function downloadArquivoMapaDamBreak(arquivo) {
         await axios.patch(`/estruturas/${structureId.value}/arquivos-estrutura/${arquivo.id}/marcar-historico`);
 
         // Atualizar a lista de arquivos
-        await carregarArquivosClassificacao();
+        await carregarArquivosMapaDamBreak();
     } catch (error) {
         toast.add({ severity: 'error', summary: 'Erro', detail: 'Falha ao baixar o arquivo', life: 3000 });
     }
@@ -554,7 +557,7 @@ async function downloadArquivoSecaoIIPAEBM(arquivo) {
         await axios.patch(`/estruturas/${structureId.value}/arquivos-estrutura/${arquivo.id}/marcar-historico`);
 
         // Atualizar a lista de arquivos
-        await carregarArquivosClassificacao();
+        await carregarArquivosSecaoIIPAEBM();
     } catch (error) {
         toast.add({ severity: 'error', summary: 'Erro', detail: 'Falha ao baixar o arquivo', life: 3000 });
     }
@@ -583,19 +586,25 @@ const carregarTodosArquivos = async () => {
 onMounted(async () => {
     if (structureId.value) {
         await carregarTodosArquivos();
-}});
+    }
+});
 
 // Filtro de auditoria
 const filteredAudits = computed(() => {
-    return audits.value.filter(audit => {
-        const userMatch = auditFilters.value.user ? (audit.user?.name || '').toLowerCase().includes(auditFilters.value.user.toLowerCase()) : true;
-        const dateMatch = auditFilters.value.date ? audit.created_at.startsWith(auditFilters.value.date) : true;
-        const fieldMatch = auditFilters.value.field
-            ? Object.keys(audit.changes || {}).some(f => f.toLowerCase().includes(auditFilters.value.field.toLowerCase()))
-            : true;
-        return userMatch && dateMatch && fieldMatch;
-    });
+  return audits.value.filter(audit => {
+    const userMatch = auditFilters.value.user 
+        ? (audit.user?.name?.toLowerCase() || '').includes(auditFilters.value.user.toLowerCase())
+        : true;
+    const dateMatch = auditFilters.value.date 
+        ? audit.created_at.startsWith(auditFilters.value.date) 
+        : true;
+    const fieldMatch = auditFilters.value.field
+        ? Object.keys(audit.changes || {}).some(f => f.toLowerCase().includes(auditFilters.value.field.toLowerCase()))
+        : true;
+    return userMatch && dateMatch && fieldMatch;
+  });
 });
+
 
 // Adicione este computed para gerar as opções do filtro de campo
 const auditFieldOptions = computed(() => {

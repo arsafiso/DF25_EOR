@@ -95,26 +95,28 @@ export const useStructureStore = defineStore('structures', () => {
     }
 
     async function updateStructure(id, structureData) {
-        loading.value = true;
-        error.value = null;
+    loading.value = true;
+    error.value = null;
 
-        const { error: errorResponse } = await makeApiRequest({
-            url: `/estruturas/${id}`,
-            method: 'put',
-            requestData: {
-                ...structureData
-            }
-        });
+    console.log("🟡 [updateStructure] Enviando dados:", JSON.stringify(structureData, null, 2));
 
-        if (errorResponse.value) {
-            error.value = 'Failed to update structure';
-            console.error('Failed to update structure:', errorResponse.value);
-            return false;
+    const { error: errorResponse } = await makeApiRequest({
+        url: `/estruturas/${id}`,
+        method: 'put',
+        requestData: {
+            ...structureData
         }
+    });
 
-        fetchStructures();
-        return true;
+    if (errorResponse.value) {
+        error.value = 'Failed to update structure';
+        console.error('Failed to update structure:', errorResponse.value);
+        return false;
     }
+
+    fetchStructures();
+    return true;
+}
 
     async function deleteStructure(id) {
         loading.value = true;
