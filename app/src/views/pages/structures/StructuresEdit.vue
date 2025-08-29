@@ -7,6 +7,7 @@ import { useRoute, useRouter } from 'vue-router';
 import axios from '@/libs/axios';
 import Calendar from 'primevue/calendar';
 import { exportarEstrutura as exportarEstruturaUtil } from '@/utils/expEstrutura';
+import { useConfirm } from 'primevue/useconfirm';
 
 const justificativa = ref('');
 const route = useRoute();
@@ -20,6 +21,9 @@ const { statusOptions, federalClassificationOptions, stateClassificationOptions,
 const isAdmin = computed(() => userStore.isAdmin);
 const isSuperAdmin = computed(() => userStore.isSuperAdmin);
 const canEdit = ref(false);
+const auditFilters = ref({ user: '', date: '', field: '' });
+const audits = ref([]);
+const confirm = useConfirm();
 
 const structure = ref({
     // Basic Information
@@ -90,7 +94,7 @@ let map = null;
 let marker = null;
 
 // Determine if we're editing or creating
-const isEditing = computed(() => route.params.id !== undefined);
+const isEditing = ref(route.params.id !== undefined);
 const structureId = computed(() => route.params.id);
 const formTitle = computed(() => (isEditing.value ? 'Editar Estrutura' : 'Criar Estrutura'));
 
@@ -162,7 +166,8 @@ onMounted(async () => {
     }
     //console.log('entrou 4');//para debug
 
-    await carregarArquivosClassificacao();
+    await carregarTodosArquivos();
+
 });
 
 const fieldTabs = {
@@ -201,97 +206,102 @@ const validateForm = async () => {
 };
 
 const saveStructure = async () => {
-    const isValid = await validateForm();
-
-    if (!isValid) {
-        toast.add({
-            severity: 'error',
-            summary: 'Validation Error',
-            detail: 'Por favor, corrija os erros de validação antes de salvar',
-            life: 3000
-        });
-        return;
-    }
-    if (isEditing.value && (!justificativa.value || !justificativa.value.trim())) {
-        toast.add({
-            severity: 'error',
-            summary: 'Erro de Validação',
-            detail: 'O campo Justificativa da Modificação é obrigatório.',
-            life: 3000
-        });
-        return;
-    }
-
     try {
-        if (isEditing.value) {
-            const result = await structureStore.updateStructure(structureId.value, {...structure.value, justificativa: justificativa.value});
+        console.log("🔵 [saveStructure] Iniciando save...");
+        console.log("🔵 [saveStructure] isEditing:", isEditing.value);
+        console.log("🔵 [saveStructure] structureId:", structureId.value);
+        console.log("🔵 [saveStructure] structure:", structure.value);
+        console.log("🔵 [saveStructure] justificativa:", justificativa.value);
 
-            if (result) {
-                toast.add({
-                    severity: 'success',
-                    summary: 'Success',
-                    detail: 'Estrutura atualizada com sucesso',
-                    life: 3000
-                });
-
-                router.push('/structures');
-            } else {
-                toast.add({
-                    severity: 'error',
-                    summary: 'Error',
-                    detail: 'Erro ao atualizar a estrutura',
-                    life: 3000
-                });
-            }
-        } else {
-            // Superadmin usa empresa selecionada
-            let payload = { 
-                ...structure.value, 
-                justificativa: justificativa.value,
-                classificacao_federal: structure.value.classificacao_federal?.value || null,
-                classificacao_estadual: structure.value.classificacao_estadual?.value || null,
-                latitude: Number(structure.value.latitude) || null,
-                longitude: Number(structure.value.longitude) || null,
-            };
-            if (isSuperAdmin.value && route.query.empresaId) {
-                payload.empresa_id = Number(route.query.empresaId);
-                payload.company_id = Number(route.query.empresaId);
-            }
-            const result = await structureStore.createStructure(payload);
-            if (result && result.error) {
-                toast.add({
-                    severity: 'error',
-                    summary: 'Error',
-                    detail: result.error,
-                    life: 3000
-                });
-            } else if (result) {
-                toast.add({
-                    severity: 'success',
-                    summary: 'Success',
-                    detail: 'Estrutura criada com sucesso',
-                    life: 3000
-                });
-
-                router.push('/structures');
-            } else {
-                toast.add({
-                    severity: 'error',
-                    summary: 'Error',
-                    detail: 'Erro ao atualizar a estrutura',
-                    life: 3000
-                });
-            }
+        // Validação do formulário
+        const isValid = await validateForm();
+        if (!isValid) {
+            toast.add({
+                severity: 'error',
+                summary: 'Validation Error',
+                detail: 'Por favor, corrija os erros de validação antes de salvar',
+                life: 3000
+            });
+            return;
         }
+
+        // Justificativa obrigatória ao editar
+        if (isEditing.value && (!justificativa.value || !justificativa.value.trim())) {
+            toast.add({
+                severity: 'error',
+                summary: 'Erro de Validação',
+                detail: 'O campo Justificativa da Modificação é obrigatório.',
+                life: 3000
+            });
+            return;
+        }
+
+        // Monta o payload
+        const payload = {
+            ...structure.value,
+            justificativa: justificativa.value,
+            classificacao_federal: structure.value.classificacao_federal?.value || null,
+            classificacao_estadual: structure.value.classificacao_estadual?.value || null,
+            latitude: Number(structure.value.latitude) || null,
+            longitude: Number(structure.value.longitude) || null,
+            arquivos_classificacao: arquivosClassificacao.value.map(a => a.id),
+            arquivos_mapa_dam_break: arquivosMapaDamBreak.value.map(a => a.id),
+            arquivos_secao_ii_paebm: arquivosSecaoIIPAEBM.value.map(a => a.id),
+        };
+
+        if (isSuperAdmin.value && route.query.empresaId) {
+            payload.empresa_id = Number(route.query.empresaId);
+            payload.company_id = Number(route.query.empresaId);
+        }
+
+        console.log("🟡 [saveStructure] Payload preparado:", payload);
+
+        let result;
+        if (isEditing.value) {
+            console.log("🟡 [saveStructure] Chamando updateStructure...");
+            result = await structureStore.updateStructure(structureId.value, payload);
+        } else {
+            console.log("🟡 [saveStructure] Chamando createStructure...");
+            result = await structureStore.createStructure(payload);
+        }
+
+        console.log("🟢 [saveStructure] Resultado da API:", result);
+
+        if (result && !result.error) {
+            toast.add({
+                severity: 'success',
+                summary: 'Success',
+                detail: isEditing.value ? 'Estrutura atualizada com sucesso' : 'Estrutura criada com sucesso',
+                life: 3000
+            });
+            router.push('/structures');
+        } else {
+            console.warn("⚠️ [saveStructure] API retornou falsy:", result);
+            toast.add({
+                severity: 'error',
+                summary: 'Error',
+                detail: isEditing.value ? 'Erro ao atualizar a estrutura' : 'Erro ao criar a estrutura',
+                life: 3000
+            });
+        }
+
     } catch (error) {
+        console.error("🔴 [saveStructure] Erro capturado:", error);
+        console.error("🔴 [saveStructure] Erro completo:", JSON.stringify(error, null, 2));
+
+        // Mostra mensagem detalhada do backend, se existir
+        const backendMessage = error?.response?.data?.message || error?.response?.data?.errors || error.message;
+
         toast.add({
             severity: 'error',
             summary: 'Error',
-            detail: 'Algo deu errado ao salvar a estrutura',
-            life: 3000
+            detail: backendMessage || 'Erro desconhecido ao salvar a estrutura',
+            life: 5000
         });
     }
 };
+
+
 
 const cancel = () => {
     router.push('/structures');
@@ -317,7 +327,7 @@ onMounted(async () => {
     }
     //console.log('entrou 4');//para debug
 
-    await carregarArquivosClassificacao();
+    await carregarTodosArquivos();
 });
 
 
@@ -367,50 +377,70 @@ const uploadLoading = ref(false);
 async function carregarArquivosClassificacao() {
     if (!structureId.value) return;
     try {
-        const resp = await axios.get(`/estruturas/${structureId.value}/arquivos-estrutura`);
+        const resp = await axios.get(`/estruturas/${structureId.value}/arquivos-estrutura?categoria=classificacao`);
         arquivosClassificacao.value = resp.data;
+        console.log('Arquivos carregados:', arquivosClassificacao.value);
     } catch (e) {
         toast.add({ severity: 'error', summary: 'Erro', detail: 'Falha ao carregar arquivos', life: 3000 });
     }
 }
 
+// --- UPLOAD DE ARQUIVOS ---
 async function uploadArquivosClassificacao(event) {
     const files = event.target.files;
     if (!files.length) return;
+
     uploadLoading.value = true;
     const formData = new FormData();
-    formData.append('file', files[0]);
-    formData.append('estrutura_id', structureId.value);
-    formData.append('categoria', 'classificacao');
+
     try {
+        // Adiciona todos os arquivos ao formData
+        for (let i = 0; i < files.length; i++) {
+            formData.append('files[]', files[i]);
+        }
+        formData.append('categoria', 'classificacao');
+        formData.append('estrutura_id', structureId.value);
+
         await axios.post(
             `/estruturas/${structureId.value}/arquivos-estrutura`,
             formData,
             { headers: { 'Content-Type': 'multipart/form-data' } }
         );
+
+        // Atualiza a lista de arquivos após envio
         await carregarArquivosClassificacao();
-        toast.add({ severity: 'success', summary: 'Sucesso', detail: 'Arquivo enviado com sucesso', life: 3000 });
+        toast.add({ severity: 'success', summary: 'Sucesso', detail: 'Arquivos enviados com sucesso', life: 3000 });
+
     } catch (e) {
-        toast.add({ severity: 'error', summary: 'Erro', detail: 'Falha ao enviar arquivo', life: 3000 });
+        toast.add({ severity: 'error', summary: 'Erro', detail: 'Falha ao enviar arquivos', life: 3000 });
     }
+
     uploadLoading.value = false;
     event.target.value = '';
 }
 
+// --- DOWNLOAD DE ARQUIVOS ---
 async function downloadArquivoClassificacao(arquivo) {
     try {
-        const response = await axios.get(`/arquivos-estrutura/${arquivo.id}/download`, { responseType: 'blob' });
+        const response = await axios.get(`/estruturas/${structureId.value}/arquivos-estrutura/${arquivo.id}/download`, { responseType: 'blob' });
         const url = window.URL.createObjectURL(new Blob([response.data]));
         const link = document.createElement('a');
         link.href = url;
-        link.setAttribute('download', arquivo.nome_arquivo); 
+        link.setAttribute('download', arquivo.nome_arquivo);
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
+
+         // Marcar o arquivo como histórico
+        await axios.patch(`/estruturas/${structureId.value}/arquivos-estrutura/${arquivo.id}/marcar-historico`);
+
+        // Atualizar a lista de arquivos
+        await carregarArquivosClassificacao();
     } catch (error) {
         toast.add({ severity: 'error', summary: 'Erro', detail: 'Falha ao baixar o arquivo', life: 3000 });
     }
 }
+
 
 // Arquivos de Mapa Dam Break
 const arquivosMapaDamBreak = ref([]);
@@ -429,47 +459,49 @@ async function carregarArquivosMapaDamBreak() {
 async function uploadArquivosMapaDamBreak(event) {
     const files = event.target.files;
     if (!files.length) return;
+
     uploadLoadingMapaDamBreak.value = true;
     const formData = new FormData();
-    formData.append('file', files[0]);
-    formData.append('estrutura_id', structureId.value);
-    formData.append('categoria', 'dam_break');
-    try {
-        await axios.post(
-            `/estruturas/${structureId.value}/arquivos-estrutura`,
-            formData,
-            { headers: { 'Content-Type': 'multipart/form-data' } }
-        );
-        await carregarArquivosMapaDamBreak();
-        toast.add({ severity: 'success', summary: 'Sucesso', detail: 'Arquivo enviado com sucesso', life: 3000 });
-    } catch (e) {
-        toast.add({ severity: 'error', summary: 'Erro', detail: 'Falha ao enviar arquivo', life: 3000 });
+
+    for (let i = 0; i < files.length; i++) {
+        formData.append('files[]', files[i]);
     }
+    formData.append('categoria', 'dam_break');
+    formData.append('estrutura_id', structureId.value);
+
+    try {
+        await axios.post(`/estruturas/${structureId.value}/arquivos-estrutura`, formData, {
+            headers: { 'Content-Type': 'multipart/form-data' }
+        });
+        await carregarArquivosMapaDamBreak();
+        toast.add({ severity: 'success', summary: 'Sucesso', detail: 'Arquivos enviados com sucesso', life: 3000 });
+    } catch (e) {
+        toast.add({ severity: 'error', summary: 'Erro', detail: 'Falha ao enviar arquivos', life: 3000 });
+    }
+
     uploadLoadingMapaDamBreak.value = false;
     event.target.value = '';
 }
 
 async function downloadArquivoMapaDamBreak(arquivo) {
     try {
-        // Faz a solicitação para o backend para obter o arquivo
-        const response = await axios.get(
-            `/estruturas/${structureId.value}/arquivos-estrutura/${arquivo.id}/download`,
-            { responseType: 'blob' }
-        );
-
-        // Cria uma URL temporária
+        const response = await axios.get(`/estruturas/${structureId.value}/arquivos-estrutura/${arquivo.id}/download`, { responseType: 'blob' });
         const url = window.URL.createObjectURL(new Blob([response.data]));
         const link = document.createElement('a');
         link.href = url;
-        link.setAttribute('download', arquivo.nome_arquivo); 
+        link.setAttribute('download', arquivo.nome_arquivo);
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
+        // Marcar o arquivo como histórico
+        await axios.patch(`/estruturas/${structureId.value}/arquivos-estrutura/${arquivo.id}/marcar-historico`);
+
+        // Atualizar a lista de arquivos
+        await carregarArquivosMapaDamBreak();
     } catch (error) {
         toast.add({ severity: 'error', summary: 'Erro', detail: 'Falha ao baixar o arquivo', life: 3000 });
     }
 }
-
 
 
 // Arquivos de Seção II da PAEBM
@@ -480,7 +512,7 @@ const uploadLoadingSecaoIIPAEBM = ref(false);
 async function carregarArquivosSecaoIIPAEBM() {
     if (!structureId.value) return;
     try {
-        const resp = await axios.get(`/estruturas/${structureId.value}/arquivos-estrutura`);
+        const resp = await axios.get(`/estruturas/${structureId.value}/arquivos-estrutura?categoria=paebm_secao_ii`);
         arquivosSecaoIIPAEBM.value = resp.data;
     } catch (e) {
         toast.add({ severity: 'error', summary: 'Erro', detail: 'Falha ao carregar arquivos', life: 3000 });
@@ -488,56 +520,87 @@ async function carregarArquivosSecaoIIPAEBM() {
 }
 
 async function uploadArquivosSecaoIIPAEBM(event) {
-    uploadLoadingSecaoIIPAEBM.value = true; 
     const files = event.target.files;
     if (!files.length) return;
-    uploadLoading.value = true;
+
+    uploadLoadingSecaoIIPAEBM.value = true;
     const formData = new FormData();
-    formData.append('file', files[0]);
-    formData.append('estrutura_id', structureId.value);
-    formData.append('categoria', 'paebm_secao_ii');
-    try {
-        await axios.post(
-            `/estruturas/${structureId.value}/arquivos-estrutura`,
-            formData,
-            { headers: { 'Content-Type': 'multipart/form-data' } }
-        );
-        await carregarArquivosSecaoIIPAEBM();
-        toast.add({ severity: 'success', summary: 'Sucesso', detail: 'Arquivo enviado com sucesso', life: 3000 });
-    } catch (e) {
-        toast.add({ severity: 'error', summary: 'Erro', detail: 'Falha ao enviar arquivo', life: 3000 });
+
+    for (let i = 0; i < files.length; i++) {
+        formData.append('files[]', files[i]);
     }
+    formData.append('categoria', 'paebm_secao_ii');
+    formData.append('estrutura_id', structureId.value);
+
+    try {
+        await axios.post(`/estruturas/${structureId.value}/arquivos-estrutura`, formData, {
+            headers: { 'Content-Type': 'multipart/form-data' }
+        });
+        await carregarArquivosSecaoIIPAEBM();
+        toast.add({ severity: 'success', summary: 'Sucesso', detail: 'Arquivos enviados com sucesso', life: 3000 });
+    } catch (e) {
+        toast.add({ severity: 'error', summary: 'Erro', detail: 'Falha ao enviar arquivos', life: 3000 });
+    }
+
     uploadLoadingSecaoIIPAEBM.value = false;
     event.target.value = '';
 }
 
 async function downloadArquivoSecaoIIPAEBM(arquivo) {
     try {
-        // Faz a solicitação para o backend para obter o arquivo
-        const response = await axios.get(
-            `/estruturas/${structureId.value}/arquivos-estrutura/${arquivo.id}/download`,
-            { responseType: 'blob' }
-        );
-
-        // Cria uma URL temporária
+        const response = await axios.get(`/estruturas/${structureId.value}/arquivos-estrutura/${arquivo.id}/download`, { responseType: 'blob' });
         const url = window.URL.createObjectURL(new Blob([response.data]));
         const link = document.createElement('a');
         link.href = url;
-        link.setAttribute('download', arquivo.nome_arquivo); 
+        link.setAttribute('download', arquivo.nome_arquivo);
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
+        // Marcar o arquivo como histórico
+        await axios.patch(`/estruturas/${structureId.value}/arquivos-estrutura/${arquivo.id}/marcar-historico`);
+
+        // Atualizar a lista de arquivos
+        await carregarArquivosSecaoIIPAEBM();
     } catch (error) {
         toast.add({ severity: 'error', summary: 'Erro', detail: 'Falha ao baixar o arquivo', life: 3000 });
     }
 }
 
-const audits = ref([]);
-const auditFilters = ref({
-    user: '',
-    date: '',
-    field: ''
-});
+//Delete de arquivo Generico
+const deleteArquivo = async (arquivo, recarregarFunc) => {
+    confirm.require({
+        message: `Você tem certeza que deseja excluir o arquivo "${arquivo.nome_arquivo}"?`,
+        header: 'Confirmação',
+        icon: 'pi pi-exclamation-triangle',
+        acceptLabel: 'Sim, excluir',
+        rejectLabel: 'Não, cancelar',
+        acceptClass: 'p-button-danger',
+        accept: async () => {
+            const deleted = await structureStore.deleteArquivoEstrutura(structureId.value, arquivo.id);
+
+            if (!deleted) {
+                return toast.add({
+                    severity: 'error',
+                    summary: 'Erro',
+                    detail: 'Erro ao remover arquivo',
+                    life: 3000
+                });
+            }
+
+            toast.add({
+                severity: 'success',
+                summary: 'Sucesso',
+                detail: 'Arquivo removido',
+                life: 3000
+            });
+
+            if (typeof recarregarFunc === 'function') {
+                await recarregarFunc();
+            }
+        }
+    });
+};
+
 
 // Carregar auditoria ordenada por data decrescente
 async function carregarAuditoria() {
@@ -546,26 +609,41 @@ async function carregarAuditoria() {
         const resp = await axios.get(`/estruturas/${structureId.value}/auditoria?order=desc`);
         audits.value = resp.data;
     } catch (e) {
+        console.error('Erro ao carregar auditoria:', e.response?.data || e.message);
         toast.add({ severity: 'error', summary: 'Erro', detail: 'Falha ao carregar histórico de alterações', life: 3000 });
     }
 }
 
-onMounted(async () => {
-    // ...existing code...
+const carregarTodosArquivos = async () => {
     await carregarAuditoria();
+    await carregarArquivosClassificacao();
+    await carregarArquivosMapaDamBreak();
+    await carregarArquivosSecaoIIPAEBM();
+};
+
+// Tenta carregar ao montar, caso structureId já esteja definido
+onMounted(async () => {
+    if (structureId.value) {
+        await carregarTodosArquivos();
+    }
 });
 
 // Filtro de auditoria
 const filteredAudits = computed(() => {
-    return audits.value.filter(audit => {
-        const userMatch = auditFilters.value.user ? (audit.user?.name || '').toLowerCase().includes(auditFilters.value.user.toLowerCase()) : true;
-        const dateMatch = auditFilters.value.date ? audit.created_at.startsWith(auditFilters.value.date) : true;
-        const fieldMatch = auditFilters.value.field
-            ? Object.keys(audit.changes || {}).some(f => f.toLowerCase().includes(auditFilters.value.field.toLowerCase()))
-            : true;
-        return userMatch && dateMatch && fieldMatch;
-    });
+  return audits.value.filter(audit => {
+    const userMatch = auditFilters.value.user 
+        ? (audit.user?.name?.toLowerCase() || '').includes(auditFilters.value.user.toLowerCase())
+        : true;
+    const dateMatch = auditFilters.value.date 
+        ? audit.created_at.startsWith(auditFilters.value.date) 
+        : true;
+    const fieldMatch = auditFilters.value.field
+        ? Object.keys(audit.changes || {}).some(f => f.toLowerCase().includes(auditFilters.value.field.toLowerCase()))
+        : true;
+    return userMatch && dateMatch && fieldMatch;
+  });
 });
+
 
 // Adicione este computed para gerar as opções do filtro de campo
 const auditFieldOptions = computed(() => {
@@ -832,6 +910,15 @@ function formatDateTime(dateStr) {
                                                             @click="downloadArquivoClassificacao(arquivo)"
                                                             title="Baixar"
                                                         />
+                                                        <Button
+                                                            icon="pi pi-trash"
+                                                            size="small"
+                                                            text
+                                                            @click="deleteArquivo(arquivo, carregarArquivosClassificacao)"
+                                                            title="Excluir"
+                                                            severity="danger"
+                                                            style ="margin: -4%;"
+                                                        />
                                                     </li>
                                                 </ul>
                                             </div>
@@ -866,6 +953,15 @@ function formatDateTime(dateStr) {
                                                             text
                                                             @click="downloadArquivoMapaDamBreak(arquivo)"
                                                             title="Baixar"
+                                                        />
+                                                        <Button
+                                                            icon="pi pi-trash"
+                                                            size="small"
+                                                            text
+                                                            @click="deleteArquivo(arquivo, carregarArquivoMapaDamBreak)"
+                                                            title="Excluir"
+                                                            severity="danger"
+                                                            style ="margin: -4%;"
                                                         />
                                                     </li>
                                                 </ul>
@@ -903,6 +999,15 @@ function formatDateTime(dateStr) {
                                                             text
                                                             @click="downloadArquivoSecaoIIPAEBM(arquivo)"
                                                             title="Baixar"
+                                                        />
+                                                        <Button
+                                                            icon="pi pi-trash"
+                                                            size="small"
+                                                            text
+                                                            @click="deleteArquivo(arquivo, carregarArquivoSecaoIIPAEBM)"
+                                                            title="Excluir"
+                                                            severity="danger"
+                                                            style ="margin: -4%;"
                                                         />
                                                     </li>
                                                 </ul>

@@ -95,26 +95,28 @@ export const useStructureStore = defineStore('structures', () => {
     }
 
     async function updateStructure(id, structureData) {
-        loading.value = true;
-        error.value = null;
+    loading.value = true;
+    error.value = null;
 
-        const { error: errorResponse } = await makeApiRequest({
-            url: `/estruturas/${id}`,
-            method: 'put',
-            requestData: {
-                ...structureData
-            }
-        });
+    console.log("🟡 [updateStructure] Enviando dados:", JSON.stringify(structureData, null, 2));
 
-        if (errorResponse.value) {
-            error.value = 'Failed to update structure';
-            console.error('Failed to update structure:', errorResponse.value);
-            return false;
+    const { error: errorResponse } = await makeApiRequest({
+        url: `/estruturas/${id}`,
+        method: 'put',
+        requestData: {
+            ...structureData
         }
+    });
 
-        fetchStructures();
-        return true;
+    if (errorResponse.value) {
+        error.value = 'Failed to update structure';
+        console.error('Failed to update structure:', errorResponse.value);
+        return false;
     }
+
+    fetchStructures();
+    return true;
+}
 
     async function deleteStructure(id) {
         loading.value = true;
@@ -133,6 +135,28 @@ export const useStructureStore = defineStore('structures', () => {
 
         return true;
     }
+
+    // Deletar arquivo genérico
+    async function deleteArquivoEstrutura(estruturaId, arquivoId) {
+    loading.value = true;
+    error.value = null;
+
+    const { error: errorResponse } = await makeApiRequest({
+        url: `/estruturas/${estruturaId}/arquivos/${arquivoId}`,
+        method: 'delete'
+    });
+
+    loading.value = false;
+
+    if (errorResponse.value) {
+        error.value = 'Falha ao deletar arquivo';
+        console.error('Falha ao deletar arquivo:', errorResponse.value);
+        return false;
+    }
+
+    return true;
+    }
+
 
     function setPage(page) {
         pagination.value.page = page;
@@ -226,6 +250,7 @@ export const useStructureStore = defineStore('structures', () => {
         clearFilters,
         fetchFederalClassifications,
         fetchStateClassificationOptions,
+        deleteArquivoEstrutura,
 
         // options
         statusOptions,

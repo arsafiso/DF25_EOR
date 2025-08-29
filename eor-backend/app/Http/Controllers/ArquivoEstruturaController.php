@@ -31,9 +31,11 @@ class ArquivoEstruturaController extends Controller
         try {
             $user = Auth::user();
             $estrutura = Estrutura::findOrFail($estruturaId);
+
             $categoria = $request->input('categoria', 'classificacao');
             $manterHistorico = $request->input('manter_historico', false);
 
+            // Validação de permissão
             $temPermissao = false;
             if ($user) {
                 if ($user->role === 'superadmin' || ($user->role === 'admin' && $user->company_id === $estrutura->company_id)) {
@@ -49,12 +51,14 @@ class ArquivoEstruturaController extends Controller
                     }
                 }
             }
+
             if (!$temPermissao) {
                 return response()->json(['error' => 'Sem permissão para enviar arquivos.'], 403);
             }
 
             $arquivos = [];
             foreach ($request->file('files') as $file) {
+                // Cria registro no banco primeiro
                 $arquivo = ArquivoEstrutura::create([
                     'estrutura_id' => $estruturaId,
                     'nome_arquivo' => $file->getClientOriginalName(),
@@ -66,17 +70,18 @@ class ArquivoEstruturaController extends Controller
                     'uploaded_at' => now(),
                 ]);
 
+                // Salva arquivo no disco
                 $path = "{$this->caminhoBase}/{$estruturaId}/{$arquivo->id}";
                 $disk = config('filesystems.default', 'public');
-                $filePath = $file->storeAs("{$this->caminhoBase}/{$estruturaId}/{$arquivo->id}", $arquivo->nome_arquivo, $disk);
-                Log::info($filePath);
+                $file->storeAs($path, $arquivo->nome_arquivo, $disk);
+
                 $arquivos[] = $arquivo;
 
-                // Audit e envio de e-mail podem ser implementados conforme categoria
-                // ...
+                Log::info("Arquivo {$arquivo->nome_arquivo} enviado para {$path}");
             }
 
             return response()->json($arquivos, 201);
+
         } catch (\Exception $e) {
             Log::error('Erro ao enviar arquivo: ' . $e->getMessage());
             return response()->json(['error' => 'Erro ao enviar arquivo.'], 500);
@@ -90,29 +95,22 @@ class ArquivoEstruturaController extends Controller
         $disk = config('filesystems.default', 'public');
         $path = "{$this->caminhoBase}/{$estruturaId}/{$arquivo->id}/{$arquivo->nome_arquivo}";
 
-        if (Storage::disk($disk)->exists($path)) {
-            if ($disk === 's3') {
-                $stream = Storage::disk('s3')->readStream($path);
-                if ($stream === false) {
-                    return response()->json(['error' => 'Arquivo não encontrado no S3'], 404);
-                }
-                return response()->streamDownload(function () use ($stream) {
-                    fpassthru($stream);
-                }, $arquivo->nome_arquivo, [
-                    'Content-Type' => $arquivo->tipo,
-                    'Content-Length' => $arquivo->tamanho,
-                    'Content-Disposition' => 'attachment; filename="' . $arquivo->nome_arquivo . '"',
-                ]);
-            } else {
-                $absolutePath = Storage::disk($disk)->path($path);
-                if (!file_exists($absolutePath)) {
-                    return response()->json(['error' => 'Arquivo não encontrado no disco'], 404);
-                }
-                return response()->download($absolutePath, $arquivo->nome_arquivo);
-            }
+        if (!Storage::disk($disk)->exists($path)) {
+            return response()->json(['error' => 'Arquivo não encontrado'], 404);
         }
 
-        return response()->json(['error' => 'Arquivo não encontrado'], 404);
+        if ($disk === 's3') {
+            $stream = Storage::disk('s3')->readStream($path);
+            return response()->streamDownload(function () use ($stream) {
+                fpassthru($stream);
+            }, $arquivo->nome_arquivo, [
+                'Content-Type' => $arquivo->tipo,
+                'Content-Length' => $arquivo->tamanho,
+                'Content-Disposition' => 'attachment; filename="' . $arquivo->nome_arquivo . '"',
+            ]);
+        }
+
+        return response()->download(Storage::disk($disk)->path($path), $arquivo->nome_arquivo);
     }
 
     // Excluir arquivo
@@ -131,15 +129,28 @@ class ArquivoEstruturaController extends Controller
         return response()->json(['success' => true]);
     }
 
-    // Listar histórico de arquivos por categoria
+    // Listar histórico de arquivos
     public function historico(Request $request, $estruturaId)
     {
         $categoria = $request->query('categoria');
-        $query = ArquivoEstrutura::where('estrutura_id', $estruturaId)->where('manter_historico', true);
+        $query = ArquivoEstrutura::where('estrutura_id', $estruturaId)
+            ->where('manter_historico', true);
+
         if ($categoria) {
             $query->where('categoria', $categoria);
         }
+
         $arquivos = $query->orderByDesc('uploaded_at')->get();
         return response()->json($arquivos);
+    }
+
+    // Marcar arquivo como histórico
+    public function marcarHistorico($estruturaId, $arquivoId)
+    {
+        $arquivo = ArquivoEstrutura::where('estrutura_id', $estruturaId)->findOrFail($arquivoId);
+        $arquivo->manter_historico = true;
+        $arquivo->save();
+
+        return response()->json($arquivo);
     }
 }

@@ -135,17 +135,23 @@ class ArquivoClassificacaoController extends Controller
     }
 
     // Excluir arquivo
-    public function destroy($estruturaId, $arquivoId)
-    {
-        $arquivo = ArquivoClassificacao::where('estrutura_id', $estruturaId)->findOrFail($arquivoId);
+    public function destroy($estruturaId, $arquivoId){
+    try {
+        $arquivo = ArquivoEstrutura::where('estrutura_id', $estruturaId)->findOrFail($arquivoId);
         $path = "{$this->caminhoBase}/{$estruturaId}/{$arquivo->id}_{$arquivo->nome_arquivo}";
 
-        if (Storage::exists($path)) {
-            Storage::delete($path);
+        if (\Storage::exists($path)) {
+            \Storage::delete($path);
         }
 
         $arquivo->delete();
 
         return response()->json(['success' => true]);
+    } catch (\Exception $e) {
+        \Log::error('Erro ao deletar arquivo: ' . $e->getMessage(), ['estrutura_id'=>$estruturaId,'arquivo_id'=>$arquivoId]);
+        return response()->json(['success' => false, 'message' => 'Erro ao deletar arquivo'], 500);
     }
+    }
+
+
 }
