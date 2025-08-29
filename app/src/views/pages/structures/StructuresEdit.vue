@@ -7,6 +7,7 @@ import { useRoute, useRouter } from 'vue-router';
 import axios from '@/libs/axios';
 import Calendar from 'primevue/calendar';
 import { exportarEstrutura as exportarEstruturaUtil } from '@/utils/expEstrutura';
+import { useConfirm } from 'primevue/useconfirm';
 
 const justificativa = ref('');
 const route = useRoute();
@@ -21,7 +22,8 @@ const isAdmin = computed(() => userStore.isAdmin);
 const isSuperAdmin = computed(() => userStore.isSuperAdmin);
 const canEdit = ref(false);
 const auditFilters = ref({ user: '', date: '', field: '' });
-const audits = ref([]); 
+const audits = ref([]);
+const confirm = useConfirm();
 
 const structure = ref({
     // Basic Information
@@ -164,7 +166,8 @@ onMounted(async () => {
     }
     //console.log('entrou 4');//para debug
 
-    await carregarArquivosClassificacao();
+    await carregarTodosArquivos();
+
 });
 
 const fieldTabs = {
@@ -324,7 +327,7 @@ onMounted(async () => {
     }
     //console.log('entrou 4');//para debug
 
-    await carregarArquivosClassificacao();
+    await carregarTodosArquivos();
 });
 
 
@@ -562,6 +565,42 @@ async function downloadArquivoSecaoIIPAEBM(arquivo) {
         toast.add({ severity: 'error', summary: 'Erro', detail: 'Falha ao baixar o arquivo', life: 3000 });
     }
 }
+
+//Delete de arquivo Generico
+const deleteArquivo = async (arquivo, recarregarFunc) => {
+    confirm.require({
+        message: `Você tem certeza que deseja excluir o arquivo "${arquivo.nome_arquivo}"?`,
+        header: 'Confirmação',
+        icon: 'pi pi-exclamation-triangle',
+        acceptLabel: 'Sim, excluir',
+        rejectLabel: 'Não, cancelar',
+        acceptClass: 'p-button-danger',
+        accept: async () => {
+            const deleted = await structureStore.deleteArquivoEstrutura(structureId.value, arquivo.id);
+
+            if (!deleted) {
+                return toast.add({
+                    severity: 'error',
+                    summary: 'Erro',
+                    detail: 'Erro ao remover arquivo',
+                    life: 3000
+                });
+            }
+
+            toast.add({
+                severity: 'success',
+                summary: 'Sucesso',
+                detail: 'Arquivo removido',
+                life: 3000
+            });
+
+            if (typeof recarregarFunc === 'function') {
+                await recarregarFunc();
+            }
+        }
+    });
+};
+
 
 // Carregar auditoria ordenada por data decrescente
 async function carregarAuditoria() {
@@ -871,6 +910,15 @@ function formatDateTime(dateStr) {
                                                             @click="downloadArquivoClassificacao(arquivo)"
                                                             title="Baixar"
                                                         />
+                                                        <Button
+                                                            icon="pi pi-trash"
+                                                            size="small"
+                                                            text
+                                                            @click="deleteArquivo(arquivo, carregarArquivosClassificacao)"
+                                                            title="Excluir"
+                                                            severity="danger"
+                                                            style ="margin: -4%;"
+                                                        />
                                                     </li>
                                                 </ul>
                                             </div>
@@ -905,6 +953,15 @@ function formatDateTime(dateStr) {
                                                             text
                                                             @click="downloadArquivoMapaDamBreak(arquivo)"
                                                             title="Baixar"
+                                                        />
+                                                        <Button
+                                                            icon="pi pi-trash"
+                                                            size="small"
+                                                            text
+                                                            @click="deleteArquivo(arquivo, carregarArquivoMapaDamBreak)"
+                                                            title="Excluir"
+                                                            severity="danger"
+                                                            style ="margin: -4%;"
                                                         />
                                                     </li>
                                                 </ul>
@@ -942,6 +999,15 @@ function formatDateTime(dateStr) {
                                                             text
                                                             @click="downloadArquivoSecaoIIPAEBM(arquivo)"
                                                             title="Baixar"
+                                                        />
+                                                        <Button
+                                                            icon="pi pi-trash"
+                                                            size="small"
+                                                            text
+                                                            @click="deleteArquivo(arquivo, carregarArquivoSecaoIIPAEBM)"
+                                                            title="Excluir"
+                                                            severity="danger"
+                                                            style ="margin: -4%;"
                                                         />
                                                     </li>
                                                 </ul>

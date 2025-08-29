@@ -28,13 +28,14 @@ Route::middleware(['auth:sanctum', ForceJsonResponse::class])->group(function ()
     Route::get('/estruturas/{id}/comentarios', [ComentarioController::class, 'index']);
     Route::post('/estruturas/{id}/comentarios', [ComentarioController::class, 'store']);
     
-    Route::prefix('estruturas/{estruturaId}/arquivos-classificacao')->group(function () {
-        Route::get('/', [ArquivoClassificacaoController::class, 'index']);
-        Route::post('/', [ArquivoClassificacaoController::class, 'store']);
-        Route::get('{arquivoId}', [ArquivoClassificacaoController::class, 'show']);
-        Route::delete('{arquivoId}', [ArquivoClassificacaoController::class, 'destroy']);
-        Route::get('{arquivoId}/download', [ArquivoClassificacaoController::class, 'download']);
+    Route::prefix('estruturas/{estruturaId}/arquivos')->group(function () {
+    Route::get('/', [ArquivoEstruturaController::class, 'index']);
+    Route::post('/', [ArquivoEstruturaController::class, 'store']);
+    Route::get('{arquivoId}', [ArquivoEstruturaController::class, 'show']);
+    Route::delete('{arquivoId}', [ArquivoEstruturaController::class, 'destroy']);
+    Route::get('{arquivoId}/download', [ArquivoEstruturaController::class, 'download']);
     });
+
 
     Route::get('/companies', [CompanyController::class, 'index']);
     Route::post('/companies', [CompanyController::class, 'store']);

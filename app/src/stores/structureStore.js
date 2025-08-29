@@ -136,6 +136,28 @@ export const useStructureStore = defineStore('structures', () => {
         return true;
     }
 
+    // Deletar arquivo genérico
+    async function deleteArquivoEstrutura(estruturaId, arquivoId) {
+    loading.value = true;
+    error.value = null;
+
+    const { error: errorResponse } = await makeApiRequest({
+        url: `/estruturas/${estruturaId}/arquivos/${arquivoId}`,
+        method: 'delete'
+    });
+
+    loading.value = false;
+
+    if (errorResponse.value) {
+        error.value = 'Falha ao deletar arquivo';
+        console.error('Falha ao deletar arquivo:', errorResponse.value);
+        return false;
+    }
+
+    return true;
+    }
+
+
     function setPage(page) {
         pagination.value.page = page;
     }
@@ -228,6 +250,7 @@ export const useStructureStore = defineStore('structures', () => {
         clearFilters,
         fetchFederalClassifications,
         fetchStateClassificationOptions,
+        deleteArquivoEstrutura,
 
         // options
         statusOptions,
